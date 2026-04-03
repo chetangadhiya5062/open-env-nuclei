@@ -1,0 +1,5 @@
+.venv_scalar/
+__pycache__/
+*.pyc
+.env
+.vscode/
