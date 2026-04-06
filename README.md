@@ -54,7 +54,7 @@ open-env-nuclei/
 
 ## ⚙️ Setup
 
-### 1. Clone the repository
+### 01. Clone the repository
 
 ```bash
 git clone https://github.com/chetangadhiya5062/open-env-nuclei.git
@@ -63,7 +63,7 @@ cd open-env-nuclei
 
 ---
 
-### 2. Create virtual environment
+### 02. Create virtual environment
 
 ```bash
 python -m venv .venv_scalar
@@ -71,7 +71,7 @@ python -m venv .venv_scalar
 
 ---
 
-### 3. Activate environment
+### 03. Activate environment
 
 **Windows:**
 
@@ -81,7 +81,7 @@ python -m venv .venv_scalar
 
 ---
 
-### 4. Install dependencies
+### 04. Install dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -107,7 +107,7 @@ python -m data_cleaning_env.inference
 
 ---
 
-## 🧠 How it Works
+## How it Works
 
 1. Environment provides dataset state
 2. Agent (LLM or logic) selects an action
@@ -120,7 +120,7 @@ python -m data_cleaning_env.inference
 
 ---
 
-## 🎯 Goal
+## Goal
 
 Train an intelligent agent that:
 
@@ -130,7 +130,7 @@ Train an intelligent agent that:
 
 ---
 
-## 🔐 Important Notes
+## Important Notes
 
 * ❌ Do NOT commit `.env` or API keys
 * ❌ Do NOT push virtual environment (`.venv_scalar`)
@@ -138,7 +138,7 @@ Train an intelligent agent that:
 
 ---
 
-## 🚀 Future Improvements
+## Future Improvements
 
 * Add training pipeline (RL algorithms)
 * Improve reward shaping
@@ -148,7 +148,7 @@ Train an intelligent agent that:
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Chetan Gadhiya**
 
