@@ -1,40 +1,49 @@
-# OpenEnv Data Cleaning RL Agent
+# 🧠 OpenEnv Data Cleaning RL Agent
 
-A reinforcement learning-based system for intelligent data cleaning using the OpenEnv framework and LLM-driven decision making.
+<p align="center">
+  🚀 Reinforcement Learning + LLMs for Intelligent Data Cleaning  
+</p>
 
 ---
 
-## Overview
+## 📌 Project Highlights
 
-This project builds a **custom RL environment** where an agent learns to clean datasets while preserving maximum useful information.
+* 🤖 LLM-powered decision making (OpenRouter)
+* 🧪 Custom RL Environment (OpenEnv)
+* 📊 Smart data cleaning with reward shaping
+* 🔁 Multi-step reasoning agent
+* ⚡ Clean, modular architecture
 
-It combines:
+---
 
-* 🧪 Reinforcement Learning (environment + rewards)
-* 🤖 LLM-based decision making (OpenRouter integration)
-* 🔄 Multi-step inference loop
-* 📊 Data cleaning strategies
+## 🖼️ Workflow
+
+```text
+Dataset → Environment → Agent (LLM) → Action → Reward → Next State → Repeat
+```
 
 ---
 
 ## ✨ Features
 
-* Custom OpenEnv environment for data cleaning
-* Actions:
+* Custom environment for real-world data cleaning
+* Intelligent actions:
 
   * `fill_missing`
   * `drop_rows_with_missing`
   * `remove_duplicates`
-* Reward shaping to prioritize **data preservation**
-* LLM agent integration (fallback supported)
-* Multi-step reasoning and execution
-* Modular and extensible design
+* Reward system focused on:
+
+  * Maximizing data retention
+  * Improving data quality
+* LLM fallback mechanism
+* Extensible architecture for future RL training
 
 ---
 
 ## 📁 Project Structure
 
-```
+```text
 open-env-nuclei/
 │
 ├── data_cleaning_env/
@@ -52,9 +61,9 @@ open-env-nuclei/
 
 ---
 
-## ⚙️ Setup
+## ⚙️ Setup Guide
 
-### 01. Clone the repository
+### 1️⃣ Clone the repository
 
 ```bash
 git clone https://github.com/chetangadhiya5062/open-env-nuclei.git
@@ -63,7 +72,7 @@ cd open-env-nuclei
 
 ---
 
-### 02. Create virtual environment
+### 2️⃣ Create virtual environment
 
 ```bash
 python -m venv .venv_scalar
@@ -71,7 +80,7 @@ python -m venv .venv_scalar
 
 ---
 
-### 03. Activate environment
+### 3️⃣ Activate environment
 
 **Windows:**
 
@@ -81,7 +90,7 @@ python -m venv .venv_scalar
 
 ---
 
-### 04. Install dependencies
+### 4️⃣ Install dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -89,9 +98,9 @@ pip install -r requirements.txt
 
 ---
 
-## ▶️ Running the Project
+## ▶️ Run the Project
 
-### Start the OpenEnv server
+### Start server
 
 ```bash
 python -m data_cleaning_env.server.app
@@ -99,7 +108,7 @@ python -m data_cleaning_env.server.app
 
 ---
 
-### Run the agent
+### Run agent
 
 ```bash
 python -m data_cleaning_env.inference
@@ -107,53 +116,70 @@ python -m data_cleaning_env.inference
 
 ---
 
-## How it Works
+## 🧠 Core Idea
 
-1. Environment provides dataset state
-2. Agent (LLM or logic) selects an action
-3. Action is applied (cleaning step)
-4. Reward is calculated based on:
+Traditional data cleaning is rule-based and rigid.
 
-   * Data preserved
-   * Quality improvement
-5. Loop continues for multiple steps
+This project introduces:
 
----
+👉 An **intelligent agent** that:
 
-## Goal
-
-Train an intelligent agent that:
-
-* Cleans messy datasets
-* Avoids unnecessary data loss
-* Makes **context-aware decisions**
+* Understands context
+* Chooses optimal cleaning actions
+* Learns from rewards
 
 ---
 
-## Important Notes
+## 🎯 Use Cases
 
-* ❌ Do NOT commit `.env` or API keys
-* ❌ Do NOT push virtual environment (`.venv_scalar`)
-* ✅ Use `requirements.txt` for dependencies
-
----
-
-## Future Improvements
-
-* Add training pipeline (RL algorithms)
-* Improve reward shaping
-* Add evaluation metrics
-* Dockerize for deployment
-* CI/CD integration
+* Data preprocessing automation
+* AI-assisted ETL pipelines
+* Smart dataset optimization
+* RL experimentation platform
 
 ---
 
-## Author
+## 🔐 Best Practices
+
+* ❌ Never commit `.env` or API keys
+* ❌ Do not push `.venv_scalar`
+* ✅ Use `requirements.txt` for reproducibility
+
+---
+
+## 🚀 Future Roadmap
+
+* [ ] Add RL training loop (PPO/DQN)
+* [ ] Visualization dashboard
+* [ ] Docker support
+* [ ] CI/CD pipeline
+* [ ] Benchmark datasets
+
+---
+
+## 👨‍💻 Author
 
 **Chetan Gadhiya**
 
 ---
 
-## ⭐ If you found this useful
+## ⭐ Support
 
-Give this repo a ⭐ and feel free to contribute!
+If you like this project:
+
+👉 Star ⭐ the repo
+👉 Share it
+👉 Contribute
+
+---
+
+## 💡 Recruiter Note
+
+This project demonstrates:
+
+* Reinforcement Learning fundamentals
+* LLM integration
+* System design thinking
+* Clean Git workflow & collaboration
+
+---
