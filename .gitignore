@@ -1,5 +1,8 @@
 .venv_scalar/
 __pycache__/
 *.pyc
+*.egg-info/
+dist/
+build/
 .env
 .vscode/
