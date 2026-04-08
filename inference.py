@@ -102,8 +102,8 @@ Return ONLY valid JSON:
             try:
                 action_text = response.choices[0].message.content
                     # 🔥 FIX: handle list response from LLM
-                    if isinstance(action_json, list):
-                        action_json = action_json[0]
+                if isinstance(action_json, list):
+                    action_json = action_json[0]
             except Exception:
                 raise Exception(f"HF failed: {response}")
 
