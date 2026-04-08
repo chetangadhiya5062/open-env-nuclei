@@ -9,6 +9,8 @@ from data_cleaning_env.models import DataCleaningAction
 # =========================
 # 🔥 HUGGINGFACE SETUP
 # =========================
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Meta-Llama-3-8B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 if not HF_TOKEN:
@@ -22,30 +24,30 @@ if not HF_TOKEN:
 ENV_URL = "http://localhost:8001"
 
 
+from openai import OpenAI
+
+client = OpenAI(
+    base_url=API_BASE_URL,
+    api_key=HF_TOKEN
+)
+
 def call_hf_model(prompt):
-    API_URL = "https://router.huggingface.co/v1/chat/completions"
-
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "meta-llama/Meta-Llama-3-8B-Instruct",  # 🔥 CHANGED
-        "messages": [
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": "You are an intelligent data cleaning agent. Always return valid JSON."},
             {"role": "user", "content": prompt}
         ]
-    }
-
-    response = requests.post(API_URL, headers=headers, json=payload)
-
-    return response.json()
+    )
+    return response
 
 
 def run_episode():
     with DataCleaningEnv(base_url=ENV_URL).sync() as env:
         result = env.reset()
         done = False
+
+        print("START")
 
         while not done:
             obs = result.observation
@@ -59,6 +61,13 @@ STRICT RULES:
 - NEVER repeat the same useless action
 - ALWAYS move to a different column if one is already clean
 - DO NOT fill a column if it has no missing values
+- NEVER repeat the same column if already filled
+- Always choose a column that still has missing values      
+- NEVER choose a column that has 0 missing values
+- ALWAYS choose a column with remaining missing values
+- If a column is already cleaned, move to another column
+- DO NOT repeat the same action on the same column
+
 
 DATA SAMPLE:
 {obs.data_sample}
@@ -86,14 +95,14 @@ Return ONLY valid JSON:
             # =========================
             # 🔥 HUGGINGFACE CALL
             # =========================
-            response_json = call_hf_model(prompt)
+            response = call_hf_model(prompt)
 
-            print("\nRAW RESPONSE:", response_json)
+            print("\nRAW RESPONSE:", response)
 
             try:
-                action_text = response_json["choices"][0]["message"]["content"]
+                action_text = response.choices[0].message.content
             except Exception:
-                raise Exception(f"HF failed: {response_json}")
+                raise Exception(f"HF failed: {response}")
 
             # =========================
             # CLEAN OUTPUT
@@ -121,10 +130,22 @@ Return ONLY valid JSON:
                     "value": "missing"
                 }
 
+            if action_json["action_type"] == "fill_missing":
+                col = action_json["column_name"]
+
+                if obs.missing_values_count_per_column.get(col, 0) == 0:
+                    # 🔥 FORCE SWITCH TO VALID COLUMN
+                    for c, v in obs.missing_values_count_per_column.items():
+                        if v > 0:
+                            action_json["column_name"] = c
+                            break
+
             if "value" in action_json and action_json["value"] is not None:
                 action_json["value"] = str(action_json["value"])
 
             action = DataCleaningAction(**action_json)
+            
+            print(f"STEP: {action_json}")
 
             result = env.step(action)
             obs = result.observation
@@ -137,6 +158,8 @@ Return ONLY valid JSON:
             done = obs.done
 
         print("\n✅ Final Reward:", result.observation.reward)
+        
+        print("END")
 
 
 if __name__ == "__main__":
