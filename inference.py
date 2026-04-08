@@ -101,9 +101,7 @@ Return ONLY valid JSON:
 
             try:
                 action_text = response.choices[0].message.content
-                    # 🔥 FIX: handle list response from LLM
-                if isinstance(action_json, list):
-                    action_json = action_json[0]
+
             except Exception:
                 raise Exception(f"HF failed: {response}")
 
@@ -123,6 +121,9 @@ Return ONLY valid JSON:
 
             try:
                 action_json = json.loads(action_text)
+                # 🔥 FIX: handle list response from LLM
+                if isinstance(action_json, list):
+                    action_json = action_json[0]
             except Exception as e:
                 print("❌ Failed to parse JSON:", action_text)
 
