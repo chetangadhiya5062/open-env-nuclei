@@ -1,17 +1,45 @@
 import json
 import requests
 import os
+import re
 
 from data_cleaning_env.client import DataCleaningEnv
 from data_cleaning_env.models import DataCleaningAction
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# =========================
+# 🔥 HUGGINGFACE SETUP
+# =========================
+HF_TOKEN = os.getenv("HF_TOKEN")
 
-# ✅ SAFETY FIX (add this)
-if not OPENROUTER_API_KEY:
-    raise Exception("OPENROUTER_API_KEY not set")
+if not HF_TOKEN:
+    raise Exception("HF_TOKEN not set")
+
+# =========================
+# 💤 OPENROUTER (BACKUP)
+# =========================
+# OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 ENV_URL = "http://localhost:8001"
+
+
+def call_hf_model(prompt):
+    API_URL = "https://router.huggingface.co/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": "meta-llama/Meta-Llama-3-8B-Instruct",  # 🔥 CHANGED
+        "messages": [
+            {"role": "user", "content": prompt}
+        ]
+    }
+
+    response = requests.post(API_URL, headers=headers, json=payload)
+
+    return response.json()
 
 
 def run_episode():
@@ -25,87 +53,88 @@ def run_episode():
             prompt = f"""
 You are a data cleaning agent.
 
-Your PRIMARY goal is to preserve as much data as possible.
+Your PRIMARY goal is to clean ALL missing values.
 
 STRICT RULES:
-- NEVER drop rows unless they are exact duplicates
-- ALWAYS prefer fill_missing over dropping rows
-- Dropping rows will be heavily penalized
+- NEVER repeat the same useless action
+- ALWAYS move to a different column if one is already clean
+- DO NOT fill a column if it has no missing values
 
-Available columns: {obs.column_names}
+DATA SAMPLE:
+{obs.data_sample}
+
+CURRENT STATE:
+Columns: {obs.column_names}
 Missing values: {obs.missing_values_count_per_column}
 Duplicate rows: {obs.duplicate_row_count}
 
-Choose ONE action:
+TASK:
+Choose the BEST next action to reduce missing values.
+
+Available actions:
 - fill_missing (requires column_name and value)
-- drop_rows_with_missing
 - remove_duplicates
 
-Return ONLY valid JSON in this format:
+Return ONLY valid JSON:
 {{
   "action_type": "...",
-  "column_name": null or "column",
-  "value": null or "value"
+  "column_name": "...",
+  "value": "..."
 }}
-
-Only return valid JSON. No explanation.
 """
 
-            models_to_try = [
-                "qwen/qwen3.6-plus:free",
-                "nvidia/nemotron-3-super-120b-a12b:free"
-            ]
+            # =========================
+            # 🔥 HUGGINGFACE CALL
+            # =========================
+            response_json = call_hf_model(prompt)
 
-            response_json = None
+            print("\nRAW RESPONSE:", response_json)
 
-            for model_name in models_to_try:
-                response = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": model_name,
-                        "messages": [
-                            {"role": "system", "content": "You are a data cleaning agent."},
-                            {"role": "user", "content": prompt}
-                        ]
-                    }
-                )
+            try:
+                action_text = response_json["choices"][0]["message"]["content"]
+            except Exception:
+                raise Exception(f"HF failed: {response_json}")
 
-                response_json = response.json()
-
-                print(f"\nTrying model: {model_name}")
-                print("RAW RESPONSE:", response_json)
-
-                if "choices" in response_json:
-                    break
-
-            if "choices" not in response_json:
-                raise Exception(f"All models failed: {response_json}")
-
-            action_text = response_json["choices"][0]["message"]["content"].strip()
-
-            if action_text.startswith("```"):
+            # =========================
+            # CLEAN OUTPUT
+            # =========================
+            if "```" in action_text:
                 action_text = action_text.split("```")[1]
 
             action_text = action_text.replace("json", "").strip()
 
+            # 🔥 CLEAN INVALID JSON (REMOVE COMMENTS)
+            action_text = re.sub(r"#.*", "", action_text)
+
+            # Remove trailing commas (optional safety)
+            action_text = action_text.replace(",}", "}").replace(",]", "]")
+
             try:
                 action_json = json.loads(action_text)
             except Exception as e:
-                print("Failed to parse JSON:", action_text)
-                raise e
+                print("❌ Failed to parse JSON:", action_text)
 
-            # Fix type mismatch (LLM may return int)
+                # ✅ FALLBACK ACTION (ADD HERE)
+                action_json = {
+                    "action_type": "fill_missing",
+                    "column_name": obs.column_names[0],
+                    "value": "missing"
+                }
+
             if "value" in action_json and action_json["value"] is not None:
                 action_json["value"] = str(action_json["value"])
 
             action = DataCleaningAction(**action_json)
 
             result = env.step(action)
-            done = result.observation.done
+            obs = result.observation
+
+            # 🔥 FORCE STOP FROM CLIENT SIDE
+            if sum(obs.missing_values_count_per_column.values()) == 0:
+                print("🔥 CLIENT: Data cleaned → stopping early")
+                break
+
+            done = obs.done
 
         print("\n✅ Final Reward:", result.observation.reward)
 

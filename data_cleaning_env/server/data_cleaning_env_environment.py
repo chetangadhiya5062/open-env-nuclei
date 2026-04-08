@@ -26,9 +26,11 @@ class DataCleaningEnvironment(Environment):
         self._state = State(episode_id=str(uuid4()), step_count=0)
         self.df: pd.DataFrame = None
         self.original_df: pd.DataFrame = None
+        self.total_reward = 0.0
 
     def reset(self):
         self._state = State(episode_id=str(uuid4()), step_count=0)
+        self.total_reward = 0.0
 
         data = {
             "name": ["Alice", "Bob", "Alice", "Charlie", "David"],
@@ -49,13 +51,18 @@ class DataCleaningEnvironment(Environment):
         prev_duplicates = self.df.duplicated().sum()
 
         reward_score = 0.0
+        done = False
 
+        # =========================
+        # APPLY ACTION
+        # =========================
         if action.action_type == "fill_missing":
             if action.column_name in self.df.columns:
-                fill_value = action.value if action.value is not None else "missing"
-                self.df[action.column_name] = self.df[action.column_name].fillna(fill_value)
-            else:
-                reward_score -= 1.0
+                if self.df[action.column_name].isnull().sum() == 0:
+                    reward_score -= 0.5   # already clean
+                else:
+                    fill_value = action.value if action.value is not None else "missing"
+                    self.df[action.column_name] = self.df[action.column_name].fillna(fill_value)
 
         elif action.action_type == "drop_rows_with_missing":
             self.df = self.df.dropna()
@@ -63,45 +70,89 @@ class DataCleaningEnvironment(Environment):
         elif action.action_type == "remove_duplicates":
             self.df = self.df.drop_duplicates()
 
+        elif action.action_type == "finish_cleaning":
+            new_missing = self.df.isnull().sum().sum()
+            new_duplicates = self.df.duplicated().sum()
+
+            if new_missing == 0 and new_duplicates == 0:
+                reward_score += 5.0   # ✅ success
+            else:
+                reward_score -= 2.0   # ❌ premature finish
+
+            done = True
+
+        # =========================
+        # NEW STATE
+        # =========================
         new_missing = self.df.isnull().sum().sum()
         new_rows = len(self.df)
         new_duplicates = self.df.duplicated().sum()
 
         # =========================
-        # ACTION-AWARE REWARD (FINAL)
+        # REWARD LOGIC (FIXED)
         # =========================
+            
         if action.action_type == "fill_missing":
-            if new_missing < prev_missing:
-                reward_score += 2.0   # strong reward
-            else:
-                reward_score -= 1.0   # useless action
+
+            # 🔥 ADD THIS FIRST (VERY IMPORTANT)
+            if prev_missing == new_missing:
+                reward_score -= 2.0   # repeated useless action
+
+            elif new_missing < prev_missing:
+                reward_score += 2.0   # good action
 
         elif action.action_type == "remove_duplicates":
             if new_duplicates < prev_duplicates:
-                reward_score += 1.5   # correct behavior
+                reward_score += 3
             else:
-                reward_score -= 0.5   # no effect
+                reward_score -= 0.2
 
         elif action.action_type == "drop_rows_with_missing":
             if new_rows < prev_rows:
-                reward_score -= 2.0   # heavy penalty
+                reward_score -= 2.0
             else:
                 reward_score -= 1.0
 
-        done = (new_missing == 0 and new_duplicates == 0) or self._state.step_count >= 10
+        if new_missing == 0 and new_duplicates == 0:
+            reward_score += 5.0
+            
+        # =========================
+        # STEP LIMIT SAFETY
+        # =========================
+        if self._state.step_count >= 10:
+            done = True
 
+        # =========================
+        # OBSERVATION
+        # =========================
         obs = self._get_obs()
-        obs.reward = reward_score
+
+        # ✅ CRITICAL FIX (ACCUMULATED REWARD)
+        self.total_reward += reward_score
+        obs.reward = self.total_reward
         obs.done = done
 
-        return obs   # ✅ ONLY observation
+        # ✅ DEBUG PRINT
+        if done:
+            print("🔥 FINAL TOTAL REWARD:", self.total_reward)
+
+        return obs
 
     def _get_obs(self) -> DataCleaningObservation:
+        print("🔥 OBS CALLED WITH DATA SAMPLE")
+        sample_df = self.df.head(5).copy()
+
+        # ✅ CRITICAL
+        sample_df = sample_df.fillna("NULL")
+
         return DataCleaningObservation(
             missing_values_count_per_column=self.df.isnull().sum().to_dict(),
             duplicate_row_count=int(self.df.duplicated().sum()),
             total_row_count=len(self.df),
             column_names=list(self.df.columns),
+
+            # ✅ Phase 12 (data visibility)
+            data_sample=self.df.head(5).fillna("missing").to_dict(orient="records"),
         )
 
     @property

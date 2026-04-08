@@ -76,6 +76,9 @@ class DataCleaningEnv(
             duplicate_row_count=obs_data.get("duplicate_row_count", 0),
             total_row_count=obs_data.get("total_row_count", 0),
             column_names=obs_data.get("column_names", []),
+            
+            data_sample = obs_data.get("data_sample", []),
+            
             reward=payload.get("reward", 0.0),
             done=payload.get("done", False),
         )

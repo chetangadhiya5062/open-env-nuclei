@@ -27,6 +27,8 @@ Usage:
     # Or run directly:
     python -m server.app
 """
+import os
+print("🔥 SERVER RUNNING FROM:", os.getcwd())
 
 try:
     from openenv.core.env_server.http_server import create_app
@@ -52,6 +54,13 @@ app = create_app(
     max_concurrent_envs=1,
 )
 
+from fastapi.responses import RedirectResponse
+
+def root():
+    return RedirectResponse(url="/docs")
+
+app.router.add_api_route("/", root, methods=["GET"])
+
 def main():
     """
     Entry point for direct execution via uv run or python -m.
@@ -74,7 +83,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=7860)
 
     args = parser.parse_args()
 

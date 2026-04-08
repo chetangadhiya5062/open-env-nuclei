@@ -8,7 +8,7 @@
 Data models for the Data Cleaning Env Environment.
 """
 
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Optional, Literal, Any
 from openenv.core.env_server.types import Action, Observation
 from pydantic import Field
 
@@ -21,7 +21,8 @@ class DataCleaningAction(Action):
     action_type: Literal[
         "fill_missing",
         "drop_rows_with_missing",
-        "remove_duplicates"
+        "remove_duplicates",
+        "finish_cleaning"
     ]
 
     column_name: Optional[str] = None
@@ -29,14 +30,14 @@ class DataCleaningAction(Action):
 
 
 class DataCleaningObservation(Observation):
-    """
-    Observation for Data Cleaning Environment.
-    """
 
-    missing_values_count_per_column: dict
+    missing_values_count_per_column: Dict[str, int]
     duplicate_row_count: int
     total_row_count: int
-    column_names: list
+    column_names: List[str]
 
-    reward: float = 0.0   # ✅ REQUIRED
+    # ✅ NEW FIELD (Phase 12)
+    data_sample: List[Dict[str, Any]]
+
+    reward: float = 0.0
     done: bool = False
