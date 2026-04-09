@@ -245,12 +245,7 @@ If this project was useful or interesting:
 
 ## Final Thought
 
-> Built as an exploration of how LLM agents behave in structured environments.
+>I have Built as an exploration of how LLM agents behave in structured environments.
 
 ---
 
-* evaluation system (VERY high impact)
-* simple UI (Gradio in 30 min)
-* benchmark demo dataset
-
-Just say 👍
