@@ -345,6 +345,13 @@ MIT License — see [LICENSE](LICENSE) for details.
         <sub><b>Chetan Gadhiya</b></sub>
       </a>
     </td>
+   <td align="center">
+      <a href="https://github.com/HilKalathiya">
+        <img src="https://github.com/HilKalathiya.png" width="100px;" alt=""/>
+        <br />
+        <sub><b>Hil Kalathiya</b></sub>
+      </a>
+    </td>
   </tr>
 </table>
 
