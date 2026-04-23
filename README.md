@@ -352,6 +352,13 @@ MIT License — see [LICENSE](LICENSE) for details.
         <sub><b>Hil Kalathiya</b></sub>
       </a>
     </td>
+   <td align="center">
+      <a href="https://github.com/SahajIVVIX-1">
+        <img src="https://github.com/SahajIVVIX-1.png" width="100px;" alt=""/>
+        <br />
+        <sub><b>Sahaj Saliya</b></sub>
+      </a>
+    </td>
   </tr>
 </table>
 
