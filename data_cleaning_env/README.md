@@ -198,12 +198,14 @@ Then multiple clients can connect simultaneously:
 from data_cleaning_env import DataCleaningAction, DataCleaningEnv
 from concurrent.futures import ThreadPoolExecutor
 
+
 def run_episode(client_id: int):
     with DataCleaningEnv(base_url="http://localhost:8000") as env:
         result = env.reset()
         for i in range(10):
             result = env.step(DataCleaningAction(message=f"Client {client_id}, step {i}"))
         return client_id, result.observation.message_length
+
 
 # Run 4 episodes concurrently
 with ThreadPoolExecutor(max_workers=4) as executor:

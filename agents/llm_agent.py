@@ -14,8 +14,8 @@ import json
 import logging
 import os
 import re
-from typing import Any, Deque, Dict, List, Optional, Tuple
 from collections import deque
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
@@ -34,7 +34,7 @@ SYSTEM_PROMPT = f"""You are a careful data-cleaning agent working on a pandas ta
 Reply with exactly ONE JSON object and nothing else (no markdown, no comments).
 
 Valid actions:
-{chr(10).join('- ' + USAGE[t] for t in ACTION_TYPES)}
+{chr(10).join("- " + USAGE[t] for t in ACTION_TYPES)}
 
 Guidance:
 - Each column shows `issues` (what is wrong and how many cells), `allowed_values`, `bad_values` and `valid_range`.
@@ -195,8 +195,15 @@ class LLMAgent(Agent):
                 last_error = str(exc)
                 logger.warning("invalid LLM reply (attempt %d/%d): %s", attempt + 1, self.max_retries + 1, last_error)
                 messages.append({"role": "assistant", "content": reply})
-                messages.append({"role": "user", "content": f"That reply was invalid: {last_error}\nReply again with one valid JSON action."})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"That reply was invalid: {last_error}\nReply again with one valid JSON action.",
+                    }
+                )
         self.fallbacks += 1
-        logger.warning("LLM fallback #%d: sending an invalid action after %d failed attempts", self.fallbacks, self.max_retries + 1)
+        logger.warning(
+            "LLM fallback #%d: sending an invalid action after %d failed attempts", self.fallbacks, self.max_retries + 1
+        )
         self._last = ("invalid_llm_output", last_error)
         return DataCleaningAction(action_type="invalid_llm_output")

@@ -39,13 +39,24 @@ class RandomAgent(Agent):
         if r.random() < self._finish_prob:
             return DataCleaningAction(action_type="finish")
         columns = [c.name for c in obs.columns]
-        kind = r.choice(["fill_missing", "drop_duplicates", "standardize_categories", "cast_type",
-                         "strip_whitespace", "fix_dates", "clip_outliers", "drop_rows_with_missing"])
+        kind = r.choice(
+            [
+                "fill_missing",
+                "drop_duplicates",
+                "standardize_categories",
+                "cast_type",
+                "strip_whitespace",
+                "fix_dates",
+                "clip_outliers",
+                "drop_rows_with_missing",
+            ]
+        )
         col: Optional[str] = r.choice(columns)
         if kind == "fill_missing":
             strategy = r.choice(_STRATEGIES)
-            return DataCleaningAction(action_type=kind, column_name=col, strategy=strategy,
-                                      value="0" if strategy == "constant" else None)
+            return DataCleaningAction(
+                action_type=kind, column_name=col, strategy=strategy, value="0" if strategy == "constant" else None
+            )
         if kind == "cast_type":
             return DataCleaningAction(action_type=kind, column_name=col, target_type=r.choice(_TARGETS))
         if kind in ("drop_duplicates",):

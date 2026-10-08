@@ -117,7 +117,14 @@ def main(argv: List[str] = None) -> int:
                 for seed in range(args.seeds):
                     result = run_episode(agent, env, task_id, seed)
                     rows.append(result.as_dict())
-                    logger.info("%s %s seed=%d score=%.3f steps=%d", result.agent, task_id, seed, result.final_score, result.steps)
+                    logger.info(
+                        "%s %s seed=%d score=%.3f steps=%d",
+                        result.agent,
+                        task_id,
+                        seed,
+                        result.final_score,
+                        result.steps,
+                    )
     finally:
         env.close()
 

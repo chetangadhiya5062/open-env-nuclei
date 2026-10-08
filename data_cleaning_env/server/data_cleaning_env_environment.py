@@ -32,7 +32,7 @@ from .. import actions as A
 from ..models import ColumnProfile, DataCleaningAction, DataCleaningObservation, DataCleaningState
 from ..schema import COLUMNS, ID_COLUMN, SCHEMA
 from . import operations
-from .datagen import get_task, generate
+from .datagen import generate, get_task
 from .grader import grade
 from .quality import column_issues, duplicate_count, issue_cells, quality_score
 
@@ -86,17 +86,23 @@ class DataCleaningEnvironment(Environment):
         self.last_message = "episode started"
         self.last_error: Optional[str] = None
         self._state = DataCleaningState(
-            episode_id=episode_id or str(uuid4()), step_count=0,
-            task_id=task_id, seed=seed, max_steps=cfg.max_steps, total_reward=0.0,
+            episode_id=episode_id or str(uuid4()),
+            step_count=0,
+            task_id=task_id,
+            seed=seed,
+            max_steps=cfg.max_steps,
+            total_reward=0.0,
         )
 
-    def reset(self, seed: Optional[int] = None, episode_id: Optional[str] = None,
-              task_id: str = DEFAULT_TASK, **kwargs: Any) -> DataCleaningObservation:
+    def reset(
+        self, seed: Optional[int] = None, episode_id: Optional[str] = None, task_id: str = DEFAULT_TASK, **kwargs: Any
+    ) -> DataCleaningObservation:
         self._start_episode(task_id, DEFAULT_SEED if seed is None else int(seed), episode_id)
         return self._observe(reward=None)
 
-    def step(self, action: DataCleaningAction, timeout_s: Optional[float] = None,
-             **kwargs: Any) -> DataCleaningObservation:
+    def step(
+        self, action: DataCleaningAction, timeout_s: Optional[float] = None, **kwargs: Any
+    ) -> DataCleaningObservation:
         if self.done:
             self.last_ok, self.last_error = False, "episode is over; call reset()"
             self.last_message = ""
@@ -141,7 +147,9 @@ class DataCleaningEnvironment(Environment):
             self.final = grade(self.df, self.truth)
             if truncated:
                 self.last_message += " (step budget exhausted, episode ended)"
-            logger.info("episode over task=%s seed=%s score=%s", self.cfg.task_id, self._state.seed, self.final["score"])
+            logger.info(
+                "episode over task=%s seed=%s score=%s", self.cfg.task_id, self._state.seed, self.final["score"]
+            )
 
         self._state.total_reward = round(self._state.total_reward + reward, 6)
         return self._observe(reward=round(reward, 6))
@@ -162,18 +170,20 @@ class DataCleaningEnvironment(Environment):
         profiles = []
         for spec in SCHEMA:
             col = self.df[spec.name]
-            profiles.append(ColumnProfile(
-                name=spec.name,
-                dtype=str(col.dtype),
-                expected_type=spec.kind,
-                missing=int(col.isna().sum()),
-                unique=int(col.nunique(dropna=True)),
-                sample_values=[str(v) for v in col.dropna().drop_duplicates().head(3).tolist()],
-                issues=column_issues(col, spec),
-                allowed_values=list(spec.allowed) if spec.allowed else None,
-                bad_values=self._bad_values(col, spec),
-                valid_range=[float(x) for x in spec.valid_range] if spec.valid_range else None,
-            ))
+            profiles.append(
+                ColumnProfile(
+                    name=spec.name,
+                    dtype=str(col.dtype),
+                    expected_type=spec.kind,
+                    missing=int(col.isna().sum()),
+                    unique=int(col.nunique(dropna=True)),
+                    sample_values=[str(v) for v in col.dropna().drop_duplicates().head(3).tolist()],
+                    issues=column_issues(col, spec),
+                    allowed_values=list(spec.allowed) if spec.allowed else None,
+                    bad_values=self._bad_values(col, spec),
+                    valid_range=[float(x) for x in spec.valid_range] if spec.valid_range else None,
+                )
+            )
         return profiles
 
     def _observe(self, reward: Optional[float]) -> DataCleaningObservation:

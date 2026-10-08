@@ -18,5 +18,4 @@ class Agent(ABC):
         self.fallbacks = 0
 
     @abstractmethod
-    def act(self, obs: DataCleaningObservation) -> DataCleaningAction:
-        ...
+    def act(self, obs: DataCleaningObservation) -> DataCleaningAction: ...

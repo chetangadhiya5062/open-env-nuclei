@@ -33,8 +33,8 @@ def suggest_mapping(bad_values: List[str], allowed: List[str]) -> Dict[str, str]
         for a in allowed:
             na = _norm(a)
             initials = "".join(w[0] for w in re.findall(r"[A-Za-z]+", a.casefold()))
-            if nb == na or nb == initials or (len(initials) >= 2 and nb.startswith(initials) and len(nb) <= len(initials) + 2) \
-                    or (len(nb) >= 3 and na.startswith(nb)):
+            by_initials = len(initials) >= 2 and nb.startswith(initials) and len(nb) <= len(initials) + 2
+            if nb == na or by_initials or (len(nb) >= 3 and na.startswith(nb)):
                 hits.add(a)
         if len(hits) == 1:
             mapping[bad] = hits.pop()

@@ -19,10 +19,45 @@ import pandas as pd
 
 from ..schema import CITIES, COLUMNS, ISO_DATE_FORMAT, PLANS
 
-FIRST_NAMES = ["Alice", "Bob", "Charlie", "Diana", "Ethan", "Fiona", "George", "Hannah", "Ivan", "Julia",
-               "Kiran", "Laura", "Mohan", "Nina", "Omar", "Priya", "Quinn", "Rahul", "Sara", "Tariq"]
-LAST_NAMES = ["Smith", "Patel", "Garcia", "Chen", "Johnson", "Khan", "Lopez", "Brown", "Shah", "Miller",
-              "Davis", "Wilson", "Kumar", "Taylor", "Moore"]
+FIRST_NAMES = [
+    "Alice",
+    "Bob",
+    "Charlie",
+    "Diana",
+    "Ethan",
+    "Fiona",
+    "George",
+    "Hannah",
+    "Ivan",
+    "Julia",
+    "Kiran",
+    "Laura",
+    "Mohan",
+    "Nina",
+    "Omar",
+    "Priya",
+    "Quinn",
+    "Rahul",
+    "Sara",
+    "Tariq",
+]
+LAST_NAMES = [
+    "Smith",
+    "Patel",
+    "Garcia",
+    "Chen",
+    "Johnson",
+    "Khan",
+    "Lopez",
+    "Brown",
+    "Shah",
+    "Miller",
+    "Davis",
+    "Wilson",
+    "Kumar",
+    "Taylor",
+    "Moore",
+]
 
 # Spellings that need an explicit mapping (cannot be fixed by case/whitespace alone).
 CITY_ALIASES = {
@@ -44,31 +79,57 @@ class TaskConfig:
     description: str
     missing: Dict[str, float] = field(default_factory=dict)  # column -> fraction of cells set to null
     dup_rate: float = 0.0
-    city_noise: float = 0.0       # fraction of city cells with case/space/alias variants
-    plan_noise: float = 0.0       # fraction of plan cells with case/space variants
+    city_noise: float = 0.0  # fraction of city cells with case/space/alias variants
+    plan_noise: float = 0.0  # fraction of plan cells with case/space variants
     name_whitespace: float = 0.0
-    str_numbers: float = 0.0      # numeric cells stored as strings ("25")
-    placeholders: float = 0.0     # numeric cells replaced by "N/A"-style tokens
-    outliers: float = 0.0         # numeric cells replaced by impossible values
-    mixed_dates: float = 0.0      # fraction of dates written in a non-ISO format
+    str_numbers: float = 0.0  # numeric cells stored as strings ("25")
+    placeholders: float = 0.0  # numeric cells replaced by "N/A"-style tokens
+    outliers: float = 0.0  # numeric cells replaced by impossible values
+    mixed_dates: float = 0.0  # fraction of dates written in a non-ISO format
 
 
 TASKS: Dict[str, TaskConfig] = {
     t.task_id: t
     for t in [
-        TaskConfig("easy-clean", 0, "easy", n_rows=40, max_steps=15,
-                   description="Dataset with only missing values in one column",
-                   missing={"age": 0.2}),
-        TaskConfig("medium-clean", 1, "medium", n_rows=60, max_steps=25,
-                   description="Dataset with missing values and duplicate rows",
-                   missing={"age": 0.15, "monthly_spend": 0.12, "city": 0.10},
-                   dup_rate=0.12),
-        TaskConfig("hard-clean", 2, "hard", n_rows=100, max_steps=45,
-                   description=("Dataset with missing values, duplicates, inconsistent categories, "
-                                "wrong types, whitespace issues, outliers and mixed date formats"),
-                   missing={"age": 0.10, "monthly_spend": 0.08, "city": 0.08, "plan": 0.08},
-                   dup_rate=0.10, city_noise=0.45, plan_noise=0.30, name_whitespace=0.25,
-                   str_numbers=0.15, placeholders=0.06, outliers=0.05, mixed_dates=0.5),
+        TaskConfig(
+            "easy-clean",
+            0,
+            "easy",
+            n_rows=40,
+            max_steps=15,
+            description="Dataset with only missing values in one column",
+            missing={"age": 0.2},
+        ),
+        TaskConfig(
+            "medium-clean",
+            1,
+            "medium",
+            n_rows=60,
+            max_steps=25,
+            description="Dataset with missing values and duplicate rows",
+            missing={"age": 0.15, "monthly_spend": 0.12, "city": 0.10},
+            dup_rate=0.12,
+        ),
+        TaskConfig(
+            "hard-clean",
+            2,
+            "hard",
+            n_rows=100,
+            max_steps=45,
+            description=(
+                "Dataset with missing values, duplicates, inconsistent categories, "
+                "wrong types, whitespace issues, outliers and mixed date formats"
+            ),
+            missing={"age": 0.10, "monthly_spend": 0.08, "city": 0.08, "plan": 0.08},
+            dup_rate=0.10,
+            city_noise=0.45,
+            plan_noise=0.30,
+            name_whitespace=0.25,
+            str_numbers=0.15,
+            placeholders=0.06,
+            outliers=0.05,
+            mixed_dates=0.5,
+        ),
     ]
 }
 
@@ -88,15 +149,17 @@ def make_clean(n: int, rng: np.random.Generator) -> pd.DataFrame:
     base = date(2021, 1, 1)
     dates = [(base + timedelta(days=int(d))).strftime(ISO_DATE_FORMAT) for d in rng.integers(0, 1000, size=n)]
     names = [f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}" for _ in range(n)]
-    return pd.DataFrame({
-        "customer_id": ids.astype("int64"),
-        "name": names,
-        "age": rng.integers(18, 81, size=n).astype("int64"),
-        "city": [str(c) for c in rng.choice(CITIES, size=n)],
-        "signup_date": dates,
-        "plan": [str(p) for p in plans],
-        "monthly_spend": spend,
-    })[COLUMNS]
+    return pd.DataFrame(
+        {
+            "customer_id": ids.astype("int64"),
+            "name": names,
+            "age": rng.integers(18, 81, size=n).astype("int64"),
+            "city": [str(c) for c in rng.choice(CITIES, size=n)],
+            "signup_date": dates,
+            "plan": [str(p) for p in plans],
+            "monthly_spend": spend,
+        }
+    )[COLUMNS]
 
 
 def _pick(rng: np.random.Generator, pool: np.ndarray, frac: float, n: int) -> np.ndarray:
@@ -122,8 +185,12 @@ def inject_noise(truth: pd.DataFrame, cfg: TaskConfig, rng: np.random.Generator)
     # numeric value-level noise: each cell gets at most one of {missing, str, placeholder, outlier}
     for col in ("age", "monthly_spend"):
         free = np.arange(n)
-        for kind, frac in (("missing", cfg.missing.get(col, 0.0)), ("str", cfg.str_numbers),
-                           ("placeholder", cfg.placeholders), ("outlier", cfg.outliers)):
+        for kind, frac in (
+            ("missing", cfg.missing.get(col, 0.0)),
+            ("str", cfg.str_numbers),
+            ("placeholder", cfg.placeholders),
+            ("outlier", cfg.outliers),
+        ):
             idx = _pick(rng, free, frac, n)
             free = np.setdiff1d(free, idx)
             for i in idx:

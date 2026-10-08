@@ -125,7 +125,5 @@ def parse_action(raw: Dict[str, Any]) -> "tuple[Optional[BaseModel], Optional[st
     try:
         return _adapter.validate_python(raw), None
     except ValidationError as exc:
-        details = "; ".join(
-            f"{'.'.join(str(p) for p in e['loc']) or 'action'}: {e['msg']}" for e in exc.errors()
-        )
+        details = "; ".join(f"{'.'.join(str(p) for p in e['loc']) or 'action'}: {e['msg']}" for e in exc.errors())
         return None, f"invalid {action_type} action ({details}). Usage: {USAGE[action_type]}"

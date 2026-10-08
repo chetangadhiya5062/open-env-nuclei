@@ -96,3 +96,68 @@ Honest limitation worth saying out loud: imputed values can't match the truth ex
 grader score is below 1.0 (the proxy reward reaches 1.0, the grader doesn't). That gap is a feature, not a bug.
 
 ---
+
+## Phase 3 - Agents & benchmark
+
+### What I changed
+- New `agents/` package with one interface (`Agent.reset(seed)`, `Agent.act(obs) -> action`):
+  - `DoNothingAgent` - finishes at once (the score of the untouched table: a floor).
+  - `RandomAgent` - seeded random actions and arguments (many are invalid on purpose).
+  - `RuleBasedAgent` - checklist baseline: dedupe -> whitespace -> categories (auto, then alias mapping via
+    prefix/initials against `allowed_values`) -> cast numerics -> fix dates -> clip outliers -> fill (median/mode)
+    -> finish. It reads only the observation; no per-city hard-coding. Each (action, column) is tried once.
+  - `LLMAgent` - HF-router chat model. Replies must be one JSON object, validated with Pydantic and the strict
+    action models. On an invalid reply it re-asks (max 2 retries) and shows the model the exact error. Keeps a
+    5-step action history in the prompt. **No hidden overrides**: if all retries fail it sends an obviously
+    invalid action (`invalid_llm_output`), logs a warning and increments `fallbacks`, which the benchmark reports.
+- `agents/runner.py`: `run_episode(agent, env, task, seed)` for either in-process (`LocalEnv`) or over WebSocket
+  against a running server (`RemoteEnv`).
+- `benchmark.py`: agents x tasks x seeds -> `episodes.csv`, `results.md` (mean +- std score, mean reward, steps,
+  invalid-action rate, fallbacks) and `scores.png`. The `llm` agent is skipped with a warning without `HF_TOKEN`.
+- `inference.py` (root, still hackathon-compatible) rewritten on top of `LLMAgent`; prints
+  `[START]`/`[STEP]`/`[END]` lines; the old forced column switching and client-side early stop are gone.
+- Environment tweak: each column profile now has `bad_values` (distinct values outside `allowed_values`) so an
+  agent can see which spellings still need mapping.
+
+### Measured results (10 seeds, in-process; also saved in `docs/benchmarks/`)
+
+| Agent | easy | medium | hard |
+|---|---|---|---|
+| do-nothing | 0.954 | 0.862 | 0.608 |
+| random | 0.871 ± 0.079 | 0.766 ± 0.073 | 0.534 ± 0.058 |
+| rule-based | 0.987 ± 0.001 | 0.980 ± 0.003 | 0.968 ± 0.003 |
+
+Honest reading: the easy task is easy - doing nothing already scores 0.95 because only ~8 cells are missing, so
+the interesting separation is on medium/hard. Random is *worse than doing nothing* because it destroys data and
+hits invalid actions (~30%). No LLM numbers yet (needs your token).
+
+**A bug the benchmark caught:** my first run showed "do-nothing" beating the rule-based agent. Cause: the grader
+checked `isinstance(x, (int, float))`, which is False for numpy `int64`, so every correctly cleaned numeric cell got
+zero credit. Fixed with `numbers.Real` (and a regression test in Phase 4). Lesson: always sanity-check a metric
+against trivial baselines.
+
+### Run the LLM benchmark yourself (PowerShell)
+```powershell
+cd D:\=Chetan\openEnv_enhancement\open-env-nuclei
+.\.venv\Scripts\Activate.ps1
+$env:HF_TOKEN = "hf_your_token_here"
+python benchmark.py --agents llm --seeds 5 --out benchmark_results_llm
+# optional: all agents side by side
+python benchmark.py --agents do-nothing,random,rule,llm --seeds 5
+# optional: against the running server instead of in-process
+python benchmark.py --agents llm --seeds 3 --env-url http://localhost:7860
+```
+Do not paste the token into any file; `.env` is git-ignored.
+
+### Why
+Without baselines a score means nothing. A random agent and a do-nothing agent give the floor, a strong heuristic
+gives a ceiling to compare an LLM against, and a benchmark with seeds and std gives numbers you can defend.
+
+### Interview explanation
+"I built three baselines and a benchmark harness before judging the LLM: do-nothing, random and a rule-based
+checklist agent. The harness runs every agent over seeded tasks and reports mean +- std. It even caught a bug in my
+own grader (numpy ints not counted as numbers) because the do-nothing baseline was beating the rule-based agent.
+For the LLM agent I removed all hidden client-side overrides; when the model fails to produce a valid action I send
+an invalid action, log it and count it, so the benchmark shows how often the model really failed."
+
+---

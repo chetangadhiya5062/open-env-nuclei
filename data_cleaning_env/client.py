@@ -7,7 +7,7 @@ Example (the server must be running, see README):
     with DataCleaningEnv(base_url="http://localhost:7860").sync() as env:
         result = env.reset(task_id="medium-clean", seed=3)
         result = env.step(DataCleaningAction(action_type="drop_duplicates"))
-        print(result.reward, result.observation.quality_score)
+        result.observation.quality_score  # 0..1, observable data quality
 """
 
 from typing import Dict

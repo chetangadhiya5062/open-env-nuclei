@@ -51,7 +51,9 @@ def fill_missing(df: pd.DataFrame, a: A.FillMissing) -> Tuple[pd.DataFrame, str]
         _require_clean_numeric(df, a.column_name, spec, f"fill_missing/{a.strategy}")
     if a.strategy in ("mean", "median"):
         if not spec.is_numeric:
-            raise ActionError(f"strategy {a.strategy!r} needs a numeric column; use 'mode' or 'constant' for {a.column_name!r}")
+            raise ActionError(
+                f"strategy {a.strategy!r} needs a numeric column; use 'mode' or 'constant' for {a.column_name!r}"
+            )
         stat = col.astype(float).mean() if a.strategy == "mean" else col.astype(float).median()
         if pd.isna(stat):
             raise ActionError(f"column {a.column_name!r} has no values to compute the {a.strategy} from")
@@ -76,10 +78,14 @@ def fill_missing(df: pd.DataFrame, a: A.FillMissing) -> Tuple[pd.DataFrame, str]
         else:
             fill = a.value
             if spec.allowed is not None and fill not in spec.allowed:
-                raise ActionError(f"constant {a.value!r} is not an allowed value for {a.column_name!r}; allowed: {list(spec.allowed)}")
+                raise ActionError(
+                    f"constant {a.value!r} is not an allowed value for {a.column_name!r}; allowed: {list(spec.allowed)}"
+                )
     out = df.copy()
     out[a.column_name] = col.fillna(fill) if not pd.api.types.is_object_dtype(col) else col.where(col.notna(), fill)
-    return out, f"filled {n_missing} missing cell(s) in {a.column_name!r} using {a.strategy}" + (f" = {fill!r}" if a.strategy != "constant" else "")
+    return out, f"filled {n_missing} missing cell(s) in {a.column_name!r} using {a.strategy}" + (
+        f" = {fill!r}" if a.strategy != "constant" else ""
+    )
 
 
 def _parses_iso(value: Optional[str]) -> bool:
@@ -120,12 +126,17 @@ def standardize_categories(df: pd.DataFrame, a: A.StandardizeCategories) -> Tupl
         if spec.allowed is not None:
             bad = sorted({v for v in a.mapping.values() if v not in spec.allowed})
             if bad:
-                raise ActionError(f"mapping targets {bad} are not allowed values for {a.column_name!r}; allowed: {list(spec.allowed)}")
+                raise ActionError(
+                    f"mapping targets {bad} are not allowed values for {a.column_name!r}; allowed: {list(spec.allowed)}"
+                )
         lookup = {normalize_ws(k).casefold(): v for k, v in a.mapping.items()}
         new = col.map(lambda v: v if pd.isna(v) else lookup.get(normalize_ws(str(v)).casefold(), v))
     changed = int((col.fillna("\0") != new.fillna("\0")).sum())
     out[a.column_name] = new
-    return out, f"standardized {changed} cell(s) in {a.column_name!r}" if changed else f"no cells in {a.column_name!r} changed"
+    return (
+        out,
+        f"standardized {changed} cell(s) in {a.column_name!r}" if changed else f"no cells in {a.column_name!r} changed",
+    )
 
 
 def strip_whitespace(df: pd.DataFrame, a: A.StripWhitespace) -> Tuple[pd.DataFrame, str]:
@@ -140,7 +151,12 @@ def strip_whitespace(df: pd.DataFrame, a: A.StripWhitespace) -> Tuple[pd.DataFra
         new = out[c].map(lambda v: normalize_ws(v) if isinstance(v, str) else v)
         changed += int((out[c].fillna("\0") != new.fillna("\0")).sum())
         out[c] = new
-    return out, f"stripped/collapsed whitespace in {changed} cell(s)" if changed else "no whitespace problems found; nothing changed"
+    return (
+        out,
+        f"stripped/collapsed whitespace in {changed} cell(s)"
+        if changed
+        else "no whitespace problems found; nothing changed",
+    )
 
 
 def _to_number(v):
@@ -199,7 +215,11 @@ def fix_dates(df: pd.DataFrame, a: A.FixDates) -> Tuple[pd.DataFrame, str]:
     changed = int((col.fillna("\0") != parsed.fillna("\0")).sum())
     out = df.copy()
     out[a.column_name] = parsed
-    msg = f"normalized {changed} date cell(s) to YYYY-MM-DD" if changed else "all dates already in YYYY-MM-DD; nothing changed"
+    msg = (
+        f"normalized {changed} date cell(s) to YYYY-MM-DD"
+        if changed
+        else "all dates already in YYYY-MM-DD; nothing changed"
+    )
     if unparsable:
         msg += f"; {unparsable} unparsable date(s) became missing"
     return out, msg
@@ -220,7 +240,11 @@ def clip_outliers(df: pd.DataFrame, a: A.ClipOutliers) -> Tuple[pd.DataFrame, st
     if spec.kind == "int":
         clipped = clipped.round()
     out[a.column_name] = clipped
-    return out, (f"clipped {changed} value(s) in {a.column_name!r} to [{lo:.4g}, {hi:.4g}]" if changed else f"no outliers in {a.column_name!r}; nothing changed")
+    return out, (
+        f"clipped {changed} value(s) in {a.column_name!r} to [{lo:.4g}, {hi:.4g}]"
+        if changed
+        else f"no outliers in {a.column_name!r}; nothing changed"
+    )
 
 
 def drop_rows_with_missing(df: pd.DataFrame, a: A.DropRowsWithMissing) -> Tuple[pd.DataFrame, str]:
@@ -228,7 +252,9 @@ def drop_rows_with_missing(df: pd.DataFrame, a: A.DropRowsWithMissing) -> Tuple[
         _spec(df, a.column_name)
     out = df.dropna(subset=[a.column_name] if a.column_name else None).reset_index(drop=True)
     removed = len(df) - len(out)
-    return out, (f"dropped {removed} row(s) with missing values" if removed else "no rows with missing values; nothing changed")
+    return out, (
+        f"dropped {removed} row(s) with missing values" if removed else "no rows with missing values; nothing changed"
+    )
 
 
 def normalize_dtypes(df: pd.DataFrame) -> pd.DataFrame:

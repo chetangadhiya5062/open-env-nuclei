@@ -48,9 +48,7 @@ def grade(df: pd.DataFrame, truth: pd.DataFrame) -> Dict[str, float]:
         if not np.isnan(rid):
             first_row_for_id.setdefault(int(rid), pos)
 
-    scales = {
-        c.name: max(float(truth[c.name].std(ddof=0)), 1e-9) for c in SCHEMA if c.is_numeric
-    }
+    scales = {c.name: max(float(truth[c.name].std(ddof=0)), 1e-9) for c in SCHEMA if c.is_numeric}
     total = 0.0
     matched = 0
     for _, true_row in truth.iterrows():
@@ -65,9 +63,9 @@ def grade(df: pd.DataFrame, truth: pd.DataFrame) -> Dict[str, float]:
             total += _cell_score(pred_row[spec.name], true_row[spec.name], scales.get(spec.name, 1.0), spec.is_numeric)
     cell_accuracy = total / (n_truth * len(SCHEMA))
     row_fidelity = matched / max(len(df), n_truth)
-    schema_score = float(np.mean([
-        1.0 if spec.name in df.columns and not column_issues(df[spec.name], spec) else 0.0 for spec in SCHEMA
-    ]))
+    schema_score = float(
+        np.mean([1.0 if spec.name in df.columns and not column_issues(df[spec.name], spec) else 0.0 for spec in SCHEMA])
+    )
     score = W_CELLS * cell_accuracy + W_ROWS * row_fidelity + W_SCHEMA * schema_score
     return {
         "score": round(float(min(1.0, max(0.0, score))), 6),
