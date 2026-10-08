@@ -10,6 +10,7 @@ episode (it uses the *initial* shape), so Q is a pure function of the current ta
 makes the shaped reward potential-based (see the module docstring of the environment).
 """
 
+import numbers
 import re
 from datetime import datetime
 from typing import Dict
@@ -36,7 +37,8 @@ def is_iso_date(value: object) -> bool:
 
 
 def is_number(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    # numbers.Real also covers numpy scalars (np.int64, np.float64)
+    return isinstance(value, numbers.Real) and not isinstance(value, bool)
 
 
 def column_issues(series: pd.Series, spec: ColumnSpec) -> Dict[str, int]:

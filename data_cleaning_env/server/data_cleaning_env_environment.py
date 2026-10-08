@@ -48,6 +48,7 @@ PREMATURE_PENALTY = 2.0
 DEFAULT_TASK = "easy-clean"
 DEFAULT_SEED = 42
 SAMPLE_ROWS = 5
+MAX_BAD_VALUES = 10
 
 
 def _py(value: Any) -> Any:
@@ -150,6 +151,13 @@ class DataCleaningEnvironment(Environment):
         return self._state
 
     # ------------------------------------------------------------------ observation
+    @staticmethod
+    def _bad_values(col: pd.Series, spec) -> list:
+        if spec.allowed is None:
+            return []
+        counts = col.dropna().astype(str).value_counts()
+        return [v for v in counts.index if v not in spec.allowed][:MAX_BAD_VALUES]
+
     def _profile(self) -> list:
         profiles = []
         for spec in SCHEMA:
@@ -163,6 +171,7 @@ class DataCleaningEnvironment(Environment):
                 sample_values=[str(v) for v in col.dropna().drop_duplicates().head(3).tolist()],
                 issues=column_issues(col, spec),
                 allowed_values=list(spec.allowed) if spec.allowed else None,
+                bad_values=self._bad_values(col, spec),
                 valid_range=[float(x) for x in spec.valid_range] if spec.valid_range else None,
             ))
         return profiles

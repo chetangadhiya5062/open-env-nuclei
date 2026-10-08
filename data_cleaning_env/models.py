@@ -49,6 +49,7 @@ class ColumnProfile(BaseModel):
     sample_values: List[str]
     issues: Dict[str, int] = Field(default_factory=dict, description="detected problems -> number of cells")
     allowed_values: Optional[List[str]] = None
+    bad_values: List[str] = Field(default_factory=list, description="distinct values outside allowed_values (max 10)")
     valid_range: Optional[List[float]] = None
 
 
