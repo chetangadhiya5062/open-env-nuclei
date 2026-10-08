@@ -161,3 +161,72 @@ For the LLM agent I removed all hidden client-side overrides; when the model fai
 an invalid action, log it and count it, so the benchmark shows how often the model really failed."
 
 ---
+
+## Phase 4 - Quality
+
+### What I changed
+- `tests/` with **78 pytest tests**, all passing (`pytest` runs in ~2.5 s):
+  - generator: determinism, seeds differ, truth is clean/dirty is dirty, each task has exactly the declared noise,
+    `openenv.yaml` task list matches the implemented tasks;
+  - every action's correctness on small hand-built tables, and that invalid actions return an error instead of raising;
+  - **reward cannot be farmed** (regression tests for the old exploits): no bonus for lingering in a clean state,
+    spamming actions is worse than finishing, terminal reward is paid once, shaping telescopes
+    (`sum(r) == 10*(Q_T-Q_0) - step costs`), destroying rows is penalised, per-step (not cumulative) reward,
+    grader hidden until the episode ends;
+  - grader: bounds, **exactly 1.0 on the ground truth**, partial numeric credit, lost rows/leftover duplicates lower it,
+    numpy-number regression;
+  - agents: reproducible random agent, rule-based never makes an invalid action, LLM agent against a **fake client**
+    (valid reply, retry with error text, fallback is counted + logged + sent as an invalid action);
+  - API via FastAPI `TestClient`: `/health`, `/schema`, `/reset` with task+seed, stateless `/step`, malformed payload,
+    and a **WebSocket session that keeps state across steps**;
+  - hygiene: UTF-8 `requirements.txt` equals `pyproject` deps, no `print`/emoji in library code, one port everywhere,
+    no hard-coded tokens.
+- Ruff configured in `pyproject.toml` (lint rules E,F,W,I,B,UP; line length 120) and the whole repo formatted.
+  `pre-commit` skipped (optional); CI enforces the same checks.
+- `.github/workflows/ci.yml`: lint + format check + tests on Python 3.10/3.11/3.12 for every push/PR, and a job that
+  builds the Docker image and curls `/health`.
+
+### What I could NOT verify
+- **Docker build:** Docker Desktop's engine wasn't running on your PC, so I did not run `docker build`. Instead I
+  installed *only* `requirements.txt` into a clean venv and served the app with the Dockerfile's uvicorn command:
+  `/health` returned healthy. The CI Docker job will do the real build on GitHub.
+- CI itself has not run (nothing is pushed).
+
+### Why
+Tests turn "I think it works" into evidence, and the exploit regression tests make sure the bug I fixed can't return
+unnoticed. CI means teammates' PRs get checked automatically.
+
+### Interview explanation
+"I wrote tests for the failure modes, not just the happy path: a test that spams actions in a clean state and asserts
+the total reward is lower than finishing, a test that the shaping sums telescope, and a test that the grader gives
+exactly 1.0 to the ground truth. CI runs lint, tests on three Python versions and a Docker build on every push."
+
+---
+
+## Decisions I made for you (veto any of them)
+1. **Moved** `pyproject.toml` and `openenv.yaml` from `data_cleaning_env/` to the repo root (one project, one manifest).
+   Deleted `data_cleaning_env/server/Dockerfile` (port 8000, stale openenv-base template) and `uv.lock` (stale).
+   If you deploy with the `openenv push` CLI you may want a server Dockerfile back - tell me.
+2. **Action names changed** (`remove_duplicates` -> `drop_duplicates`, `finish_cleaning` -> `finish`, `fill_missing`
+   now needs `strategy`). The old API is gone, as the Phase 2 spec asked for a richer action space.
+3. The **schema** (types, allowed values such as the 5 cities, valid ranges) is shown to the agent in the
+   observation. I judged this fair (like column constraints in a database) and necessary to make "NY -> New York"
+   well-defined. If you prefer a harder "discover the vocabulary yourself" variant, that is a roadmap item.
+4. Grader weights (0.6 cells / 0.2 rows / 0.2 schema) and reward constants are my choices; they live as named
+   constants at the top of `grader.py` / the environment module.
+5. Default `reset()` with no arguments = `easy-clean`, seed 42 (deterministic).
+6. Git identity: the repo had no local git user, so I set a **repo-local** `user.name=Chetan Gadhiya`,
+   `user.email=chetangadhiya4939@gmail.com` for the commits. Change with `git config --local` and amend if you like.
+   Commits carry a `Co-Authored-By: Claude` trailer.
+7. Python: your PC had no Python, so I used `uv` to create `.venv` (Python 3.11). `.venv/` is git-ignored.
+8. Not done, by instruction: Phase 5 (Gradio UI, full README rewrite, resume bullet), Phase 6, push and PR.
+   The README is still the short honest Phase 1 version and does not yet describe the new environment in detail.
+
+## How to continue when you're back
+```powershell
+cd D:\=Chetan\openEnv_enhancement\open-env-nuclei
+git log --oneline main..v2          # review the commits
+.\.venv\Scripts\python.exe -m pytest      # 78 tests
+.\.venv\Scripts\python.exe benchmark.py --agents do-nothing,random,rule --seeds 10
+```
+Then tell me "go" for Phase 5 (or push + PR first).
