@@ -230,3 +230,49 @@ git log --oneline main..v2          # review the commits
 .\.venv\Scripts\python.exe benchmark.py --agents do-nothing,random,rule --seeds 10
 ```
 Then tell me "go" for Phase 5 (or push + PR first).
+
+---
+
+## Phase 5 - Demo & presentation
+
+### What I changed
+- `data_cleaning_env/ui.py`: Gradio app (task, seed and agent dropdowns; step-by-step table of action / reward /
+  quality / result; before and after tables; final grader breakdown). It runs episodes in-process, so visitors never
+  share state. Mounted at `/demo` inside the same FastAPI app (`app.py`), and `/` now redirects there. If Gradio
+  fails to import, the API still starts. The `llm` option appears only when `HF_TOKEN` is set. I opened it in the
+  browser and ran a `hard-clean` episode: final grader score 0.971 for seed 0, 15 steps, 0 invalid actions.
+- `gradio>=5,<7` is now an explicit dependency (OpenEnv already pulled it in).
+- `README.md` fully rewritten: pitch, Mermaid architecture diagram, task table, action table, observation, reward
+  formula, grader formula, the real benchmark table, quick start (local / Docker / HF), roadmap, limitations,
+  contributors kept. The LLM row says "not measured yet" - there is no invented number anywhere.
+- `data_cleaning_env/README.md`: Space card with `app_port: 7860`, `base_path: /demo`, accurate description.
+- Added a test that `/demo` is mounted and an episode runs (79 tests).
+
+### Resume bullet (only things that are implemented and measured)
+> Built an OpenEnv reinforcement-learning environment for tabular data cleaning (Python, pandas, Pydantic, FastAPI):
+> seeded synthetic tasks with hidden ground truth, a 9-action typed action space, a potential-based shaped reward with
+> tested anti-exploit properties, and a separate 0-1 grader. Benchmarked random, rule-based and LLM-prompting agents
+> over seeded runs (rule-based 0.97-0.99 vs 0.53-0.87 for random); 79 tests and CI with Docker build; Gradio demo
+> deployed on Hugging Face Spaces.
+
+Remove the last clause ("deployed on Hugging Face Spaces") until you redeploy v2, and add LLM numbers once you run them.
+Do **not** write "trained" or "learns": the LLM agent is zero-shot and no RL training exists yet (Phase 6).
+
+### 60-second interview pitch
+"I built an environment where an agent cleans a messy table step by step, following the OpenEnv API. The data is
+synthetic and seeded, so every run is reproducible, and I keep the clean version hidden. The agent has nine typed
+actions - fill, dedupe, standardise categories, fix dates and so on - and invalid actions come back as error messages,
+not crashes. For the reward I used potential-based shaping on an observable quality score, so you can't farm reward by
+repeating actions - I wrote tests that try. The final grade compares against the hidden truth and is deliberately
+separate from the reward. I benchmarked a random agent, a do-nothing agent and a rule-based agent over seeded runs;
+the benchmark also caught a bug in my own grader. I also built an LLM agent that must output validated JSON, retries
+with the error message, and counts failures rather than silently fixing them. Honest limitation: nothing is trained
+yet - the next step is an RL policy to compare against those baselines."
+
+### Interview explanation of the key design choice
+"Reward and evaluation are different on purpose. Reward is a dense proxy that guides learning; the grader measures the
+real objective. When they disagree - for example a constant imputation raises the proxy but lowers the grade - that is
+exactly the reward-hacking signal I want to be able to see."
+
+### Not done
+- Phase 6 (RL training), as instructed. HF Space not redeployed (needs your account). No PR opened yet.

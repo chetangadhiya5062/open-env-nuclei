@@ -20,7 +20,7 @@ def test_health_and_schema(client):
 
 def test_root_redirects_to_docs(client):
     r = client.get("/", follow_redirects=False)
-    assert r.status_code in (302, 307) and r.headers["location"] == "/docs"
+    assert r.status_code in (302, 307) and r.headers["location"] in ("/demo", "/docs")
 
 
 def test_http_reset_selects_task_and_seed(client):
@@ -59,3 +59,12 @@ def test_websocket_session_keeps_state_across_steps(client):
         assert last["done"] is True
         assert 0.0 <= last["observation"]["final_score"] <= 1.0
         assert last["observation"]["step_count"] == 2
+
+
+def test_demo_is_mounted_and_runs_an_episode(client):
+    from data_cleaning_env.ui import run_demo
+
+    assert client.get("/demo/").status_code == 200
+    *_, (steps, before, after, summary) = [(s, b, a, m) for s, b, a, m in run_demo("medium-clean", 0, "rule-based")]
+    assert len(steps) >= 2 and "Grader score" in summary
+    assert len(after) < len(before)  # duplicates removed

@@ -34,8 +34,25 @@ app = create_app(
 )
 
 
+def _mount_demo() -> str:
+    """Mount the Gradio demo at /demo when gradio is installed; return the landing path."""
+    try:
+        import gradio as gr
+
+        from ..ui import build_demo
+
+        gr.mount_gradio_app(app, build_demo(), path="/demo")
+        return "/demo"
+    except Exception:  # the API must keep working without the optional UI
+        logger.exception("Gradio demo not mounted")
+        return "/docs"
+
+
+LANDING = _mount_demo()
+
+
 def _root() -> RedirectResponse:
-    return RedirectResponse(url="/docs")
+    return RedirectResponse(url=LANDING)
 
 
 app.router.add_api_route("/", _root, methods=["GET"], include_in_schema=False)
