@@ -1,29 +1,20 @@
 FROM python:3.11-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
 WORKDIR /app
 
-# Copy requirements first (for caching)
+# Install dependencies first (better layer caching)
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . .
 
-# Environment variables
-ENV OPENENV_PORT=7860
-ENV HOST=0.0.0.0
-
-# Expose port (HuggingFace standard)
+# Hugging Face Spaces expects the app on port 7860. Override with -e PORT=...
+ENV PORT=7860
+ENV PYTHONUNBUFFERED=1
 EXPOSE 7860
 
-# Run OpenEnv server
-CMD ["uvicorn", "data_cleaning_env.server.app:app", "--host", "0.0.0.0", "--port", "7860"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD python -c "import os,urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.getenv('PORT','7860'))" || exit 1
+
+CMD ["sh", "-c", "uvicorn data_cleaning_env.server.app:app --host 0.0.0.0 --port ${PORT:-7860}"]

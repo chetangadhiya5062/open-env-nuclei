@@ -1,95 +1,78 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+"""FastAPI application for the Data Cleaning environment.
 
+Endpoints (provided by OpenEnv's ``create_app``):
+    GET  /health   liveness probe
+    GET  /schema   action / observation JSON schemas
+    POST /reset    stateless one-shot reset (each HTTP call builds a fresh env)
+    POST /step     stateless one-shot step
+    WS   /ws       persistent session: the one to use for real episodes
+
+Run locally:
+    python -m data_cleaning_env.server.app            # port from $PORT, default 7860
+    uvicorn data_cleaning_env.server.app:app --port 7860
 """
-FastAPI application for the Data Cleaning Env Environment.
 
-This module creates an HTTP server that exposes the DataCleaningEnvironment
-over HTTP and WebSocket endpoints, compatible with EnvClient.
-
-Endpoints:
-    - POST /reset: Reset the environment
-    - POST /step: Execute an action
-    - GET /state: Get current environment state
-    - GET /schema: Get action/observation schemas
-    - WS /ws: WebSocket endpoint for persistent sessions
-
-Usage:
-    # Development (with auto-reload):
-    uvicorn server.app:app --reload --host 0.0.0.0 --port 8000
-
-    # Production:
-    uvicorn server.app:app --host 0.0.0.0 --port 8000 --workers 4
-
-    # Or run directly:
-    python -m server.app
-"""
+import logging
 import os
-print("🔥 SERVER RUNNING FROM:", os.getcwd())
 
-try:
-    from openenv.core.env_server.http_server import create_app
-except Exception as e:  # pragma: no cover
-    raise ImportError(
-        "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
-    ) from e
+from fastapi.responses import RedirectResponse
+from openenv.core.env_server.http_server import create_app
 
-try:
-    from ..models import DataCleaningAction, DataCleaningObservation
-    from .data_cleaning_env_environment import DataCleaningEnvironment
-except ModuleNotFoundError:
-    from models import DataCleaningAction, DataCleaningObservation
-    from server.data_cleaning_env_environment import DataCleaningEnvironment
+from ..models import DataCleaningAction, DataCleaningObservation
+from .data_cleaning_env_environment import DataCleaningEnvironment
 
+logger = logging.getLogger(__name__)
 
-# ✅ Create FastAPI app
+DEFAULT_PORT = 7860
+
 app = create_app(
     DataCleaningEnvironment,
     DataCleaningAction,
     DataCleaningObservation,
     env_name="data_cleaning_env",
-    max_concurrent_envs=1,
+    max_concurrent_envs=int(os.getenv("MAX_CONCURRENT_ENVS", "4")),
 )
 
-from fastapi.responses import RedirectResponse
 
-def root():
-    return RedirectResponse(url="/docs")
+def _mount_demo() -> str:
+    """Mount the Gradio demo at /demo when gradio is installed; return the landing path."""
+    try:
+        import gradio as gr
 
-app.router.add_api_route("/", root, methods=["GET"])
+        from ..ui import build_demo
 
-def main():
-    """
-    Entry point for direct execution via uv run or python -m.
+        gr.mount_gradio_app(app, build_demo(), path="/demo")
+        return "/demo"
+    except Exception:  # the API must keep working without the optional UI
+        logger.exception("Gradio demo not mounted")
+        return "/docs"
 
-    This function enables running the server without Docker:
-        uv run --project . server
-        uv run --project . server --port 8001
-        python -m data_cleaning_env.server.app
 
-    Args:
-        host: Host address to bind to (default: "0.0.0.0")
-        port: Port number to listen on (default: 8000)
+LANDING = _mount_demo()
 
-    For production deployments, consider using uvicorn directly with
-    multiple workers:
-        uvicorn data_cleaning_env.server.app:app --workers 4
-    """
+
+def _root() -> RedirectResponse:
+    return RedirectResponse(url=LANDING)
+
+
+app.router.add_api_route("/", _root, methods=["GET"], include_in_schema=False)
+
+
+def main() -> None:
+    """Entry point for ``python -m data_cleaning_env.server.app``."""
     import argparse
+
     import uvicorn
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", type=str, default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=7860)
-
+    parser = argparse.ArgumentParser(description="Run the Data Cleaning OpenEnv server")
+    parser.add_argument("--host", default=os.getenv("HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", DEFAULT_PORT)))
     args = parser.parse_args()
 
-    print(f"\n🚀 Starting server on http://{args.host}:{args.port}\n")
-
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logger.info("Starting server on http://%s:%d", args.host, args.port)
     uvicorn.run(app, host=args.host, port=args.port)
+
 
 if __name__ == "__main__":
     main()

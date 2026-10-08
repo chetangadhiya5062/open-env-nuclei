@@ -1,170 +1,78 @@
-import json
-import requests
-import os
-import re
+"""Run the LLM agent against a running environment server.
 
-from data_cleaning_env.client import DataCleaningEnv
-from data_cleaning_env.models import DataCleaningAction
+Kept at the repository root because the Meta x Scaler OpenEnv hackathon submission requires a root-level
+``inference.py``. Stdout uses the [START] / [STEP] / [END] line format; diagnostics go through ``logging``
+(stderr).
 
-# =========================
-# 🔥 HUGGINGFACE SETUP
-# =========================
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Meta-Llama-3-8B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
+    $env:HF_TOKEN = "hf_..."          # see .env.example
+    python -m data_cleaning_env.server.app      # terminal 1 (port 7860)
+    python inference.py                         # terminal 2 (all three tasks)
+    python inference.py --task hard-clean --seed 3
 
-if not HF_TOKEN:
-    raise Exception("HF_TOKEN not set")
-
-# =========================
-# 💤 OPENROUTER (BACKUP)
-# =========================
-# OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-ENV_URL = "http://localhost:8001"
-
-
-from openai import OpenAI
-
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=HF_TOKEN
-)
-
-def call_hf_model(prompt):
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": "You are an intelligent data cleaning agent. Always return valid JSON."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    return response
-
-
-def run_episode():
-    with DataCleaningEnv(base_url=ENV_URL).sync() as env:
-        result = env.reset()
-        done = False
-
-        print("START")
-
-        while not done:
-            obs = result.observation
-
-            prompt = f"""
-You are a data cleaning agent.
-
-Your PRIMARY goal is to clean ALL missing values.
-
-STRICT RULES:
-- NEVER repeat the same useless action
-- ALWAYS move to a different column if one is already clean
-- DO NOT fill a column if it has no missing values
-- NEVER repeat the same column if already filled
-- Always choose a column that still has missing values      
-- NEVER choose a column that has 0 missing values
-- ALWAYS choose a column with remaining missing values
-- If a column is already cleaned, move to another column
-- DO NOT repeat the same action on the same column
-
-
-DATA SAMPLE:
-{obs.data_sample}
-
-CURRENT STATE:
-Columns: {obs.column_names}
-Missing values: {obs.missing_values_count_per_column}
-Duplicate rows: {obs.duplicate_row_count}
-
-TASK:
-Choose the BEST next action to reduce missing values.
-
-Available actions:
-- fill_missing (requires column_name and value)
-- remove_duplicates
-
-Return ONLY valid JSON:
-{{
-  "action_type": "...",
-  "column_name": "...",
-  "value": "..."
-}}
+Environment variables: HF_TOKEN, API_BASE_URL, MODEL_NAME, ENV_URL (default http://localhost:7860).
 """
 
-            # =========================
-            # 🔥 HUGGINGFACE CALL
-            # =========================
-            response = call_hf_model(prompt)
+import argparse
+import json
+import logging
+import os
+import sys
+from typing import List
 
-            print("\nRAW RESPONSE:", response)
+from dotenv import load_dotenv
 
-            try:
-                action_text = response.choices[0].message.content
+from agents import LLMAgent, RemoteEnv, run_episode
+from data_cleaning_env.server.datagen import TASKS
 
-            except Exception:
-                raise Exception(f"HF failed: {response}")
+BENCHMARK_NAME = "data_cleaning_env"
+SUCCESS_THRESHOLD = 0.8  # grader score at or above which an episode is reported as a success
 
-            # =========================
-            # CLEAN OUTPUT
-            # =========================
-            if "```" in action_text:
-                action_text = action_text.split("```")[1]
+logger = logging.getLogger("inference")
 
-            action_text = action_text.replace("json", "").strip()
 
-            # 🔥 CLEAN INVALID JSON (REMOVE COMMENTS)
-            action_text = re.sub(r"#.*", "", action_text)
+def run_task(agent: LLMAgent, env: RemoteEnv, task_id: str, seed: int) -> float:
+    rewards: List[float] = []
+    print(f"[START] task={task_id} env={BENCHMARK_NAME} model={agent.model}", flush=True)
 
-            # Remove trailing commas (optional safety)
-            action_text = action_text.replace(",}", "}").replace(",]", "]")
+    def on_step(step, action, obs):
+        rewards.append(float(obs.reward or 0.0))
+        error = json.dumps(obs.last_error) if obs.last_error else "null"
+        print(
+            f"[STEP] step={step} action={json.dumps(action.to_payload(), separators=(',', ':'))} "
+            f"reward={rewards[-1]:.2f} done={str(obs.done).lower()} error={error}",
+            flush=True,
+        )
 
-            try:
-                action_json = json.loads(action_text)
-                # 🔥 FIX: handle list response from LLM
-                if isinstance(action_json, list):
-                    action_json = action_json[0]
-            except Exception as e:
-                print("❌ Failed to parse JSON:", action_text)
+    result = run_episode(agent, env, task_id, seed, on_step=on_step)
+    print(
+        f"[END] success={str(result.final_score >= SUCCESS_THRESHOLD).lower()} steps={result.steps} "
+        f"score={result.final_score:.3f} rewards={','.join(f'{r:.2f}' for r in rewards)}",
+        flush=True,
+    )
+    return result.final_score
 
-                # ✅ FALLBACK ACTION (ADD HERE)
-                action_json = {
-                    "action_type": "fill_missing",
-                    "column_name": obs.column_names[0],
-                    "value": "missing"
-                }
 
-            if action_json["action_type"] == "fill_missing":
-                col = action_json["column_name"]
+def main() -> int:
+    load_dotenv()
+    parser = argparse.ArgumentParser(description="Run the LLM agent on the data-cleaning environment")
+    parser.add_argument("--task", choices=sorted(TASKS), default=None, help="default: run all tasks")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--env-url", default=os.getenv("ENV_URL", "http://localhost:7860"))
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s", stream=sys.stderr)
 
-                if obs.missing_values_count_per_column.get(col, 0) == 0:
-                    # 🔥 FORCE SWITCH TO VALID COLUMN
-                    for c, v in obs.missing_values_count_per_column.items():
-                        if v > 0:
-                            action_json["column_name"] = c
-                            break
-
-            if "value" in action_json and action_json["value"] is not None:
-                action_json["value"] = str(action_json["value"])
-
-            action = DataCleaningAction(**action_json)
-            
-            print(f"STEP: {action_json}")
-
-            result = env.step(action)
-            obs = result.observation
-
-            # 🔥 FORCE STOP FROM CLIENT SIDE
-            if sum(obs.missing_values_count_per_column.values()) == 0:
-                print("🔥 CLIENT: Data cleaned → stopping early")
-                break
-
-            done = obs.done
-
-        print("\n✅ Final Reward:", result.observation.reward)
-        
-        print("END")
+    if not LLMAgent.available():
+        logger.error("HF_TOKEN is not set. Copy .env.example to .env and fill it in.")
+        return 1
+    agent = LLMAgent()
+    env = RemoteEnv(args.env_url)
+    try:
+        for task_id in [args.task] if args.task else list(TASKS):
+            run_task(agent, env, task_id, args.seed)
+    finally:
+        env.close()
+    return 0
 
 
 if __name__ == "__main__":
-    run_episode()
+    sys.exit(main())

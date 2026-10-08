@@ -3,10 +3,10 @@ name: data-cleaner-rl
 
 type: space
 runtime: fastapi
-app: server.app:app
-port: 8000
+app: data_cleaning_env.server.app:app
+port: 7860
 
-entry_point: server.data_cleaning_env_environment:DataCleaningEnvironment
+entry_point: data_cleaning_env.server.data_cleaning_env_environment:DataCleaningEnvironment
 
 tasks:
   - id: easy-clean
