@@ -1,38 +1,36 @@
 import json
-import requests
+import logging
 import os
 import re
+
+from dotenv import load_dotenv
+from openai import OpenAI
 
 from data_cleaning_env.client import DataCleaningEnv
 from data_cleaning_env.models import DataCleaningAction
 
-# =========================
-# 🔥 HUGGINGFACE SETUP
-# =========================
+load_dotenv()
+logger = logging.getLogger(__name__)
+
+# Hugging Face router (OpenAI-compatible)
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Meta-Llama-3-8B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
+ENV_URL = os.getenv("ENV_URL", "http://localhost:7860")
 
-if not HF_TOKEN:
-    raise Exception("HF_TOKEN not set")
-
-# =========================
-# 💤 OPENROUTER (BACKUP)
-# =========================
-# OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-ENV_URL = "http://localhost:8001"
+client = None
 
 
-from openai import OpenAI
-
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=HF_TOKEN
-)
+def _get_client() -> OpenAI:
+    global client
+    if client is None:
+        if not HF_TOKEN:
+            raise RuntimeError("HF_TOKEN is not set (see .env.example)")
+        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    return client
 
 def call_hf_model(prompt):
-    response = client.chat.completions.create(
+    response = _get_client().chat.completions.create(
         model=MODEL_NAME,
         messages=[
             {"role": "system", "content": "You are an intelligent data cleaning agent. Always return valid JSON."},
@@ -125,7 +123,7 @@ Return ONLY valid JSON:
                 if isinstance(action_json, list):
                     action_json = action_json[0]
             except Exception as e:
-                print("❌ Failed to parse JSON:", action_text)
+                logger.warning("Failed to parse JSON: %s", action_text)
 
                 # ✅ FALLBACK ACTION (ADD HERE)
                 action_json = {
@@ -156,7 +154,7 @@ Return ONLY valid JSON:
 
             # 🔥 FORCE STOP FROM CLIENT SIDE
             if sum(obs.missing_values_count_per_column.values()) == 0:
-                print("🔥 CLIENT: Data cleaned → stopping early")
+                logger.info("client-side early stop: no missing values left")
                 break
 
             done = obs.done
@@ -167,4 +165,5 @@ Return ONLY valid JSON:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     run_episode()

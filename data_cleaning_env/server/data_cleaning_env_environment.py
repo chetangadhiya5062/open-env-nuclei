@@ -5,17 +5,21 @@
 Data Cleaning Env Environment Implementation.
 """
 
-import pandas as pd
+import logging
 from uuid import uuid4
+
+import pandas as pd
 
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
-from openenv.core.client_types import StepResult  # ✅ IMPORTANT
 
 try:
     from ..models import DataCleaningAction, DataCleaningObservation
 except ImportError:
     from models import DataCleaningAction, DataCleaningObservation
+
+
+logger = logging.getLogger(__name__)
 
 
 class DataCleaningEnvironment(Environment):
@@ -61,7 +65,7 @@ class DataCleaningEnvironment(Environment):
                 if self.df[action.column_name].isnull().sum() == 0:
                     reward_score -= 0.5   # already clean
                 else:
-                    fill_value = action.value if action.value is not None else "missing"
+                    fill_value = action.value if action.value is not None else "missing" 
                     self.df[action.column_name] = self.df[action.column_name].fillna(fill_value)
 
         elif action.action_type == "drop_rows_with_missing":
@@ -132,19 +136,12 @@ class DataCleaningEnvironment(Environment):
         obs.reward = self.total_reward
         obs.done = done
 
-        # ✅ DEBUG PRINT
         if done:
-            print("🔥 FINAL TOTAL REWARD:", self.total_reward)
+            logger.info("episode finished: total_reward=%s", self.total_reward)
 
         return obs
 
     def _get_obs(self) -> DataCleaningObservation:
-        print("🔥 OBS CALLED WITH DATA SAMPLE")
-        sample_df = self.df.head(5).copy()
-
-        # ✅ CRITICAL
-        sample_df = sample_df.fillna("NULL")
-
         return DataCleaningObservation(
             missing_values_count_per_column=self.df.isnull().sum().to_dict(),
             duplicate_row_count=int(self.df.duplicated().sum()),
@@ -152,7 +149,7 @@ class DataCleaningEnvironment(Environment):
             column_names=list(self.df.columns),
 
             # ✅ Phase 12 (data visibility)
-            data_sample=self.df.head(5).fillna("missing").to_dict(orient="records"),
+            data_sample=self.df.head(5).astype(object).where(self.df.head(5).notna(), None).to_dict(orient="records"),
         )
 
     @property
