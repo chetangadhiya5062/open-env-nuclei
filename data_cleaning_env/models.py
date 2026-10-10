@@ -77,7 +77,11 @@ class DataCleaningObservation(Observation):
 
     # Only set once the episode is over; computed against the hidden ground truth.
     final_score: Optional[float] = Field(None, description="grader score in [0, 1], set when done")
-    score_breakdown: Optional[Dict[str, float]] = None
+    score_breakdown: Optional[Dict[str, float]] = Field(
+        None,
+        description="score, cell_accuracy, row_fidelity, schema_score, do_nothing_score and improvement "
+        "(= (score - do_nothing_score) / (1 - do_nothing_score))",
+    )
 
 
 class DataCleaningState(State):

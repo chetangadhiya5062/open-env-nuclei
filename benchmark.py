@@ -34,7 +34,7 @@ AGENT_FACTORIES: Dict[str, Callable[[], Agent]] = {
     "rule": RuleBasedAgent,
     "llm": LLMAgent,
 }
-FALLBACK_LLM_MODELS = ["meta-llama/Llama-3.1-8B-Instruct", "Qwen/Qwen2.5-7B-Instruct"]
+FALLBACK_LLM_MODELS = ["openai/gpt-oss-20b", "Qwen/Qwen3-8B"]
 DEFAULT_AGENTS = ["do-nothing", "random", "rule"]
 
 
@@ -80,6 +80,8 @@ def summarize(episodes: pd.DataFrame) -> pd.DataFrame:
         episodes=("seed", "count"),
         score_mean=("final_score", "mean"),
         score_std=("final_score", "std"),
+        impr_mean=("improvement", "mean"),
+        impr_std=("improvement", "std"),
         reward_mean=("total_reward", "mean"),
         steps_mean=("steps", "mean"),
         invalid=("invalid_actions", "sum"),
@@ -88,20 +90,21 @@ def summarize(episodes: pd.DataFrame) -> pd.DataFrame:
         api_errors=("api_errors", "sum"),
     ).reset_index()
     out["score_std"] = out["score_std"].fillna(0.0)
+    out["impr_std"] = out["impr_std"].fillna(0.0)
     out["invalid_rate"] = out["invalid"] / out["total_steps"].clip(lower=1)
     return out
 
 
 def to_markdown(summary: pd.DataFrame, n_seeds: int) -> str:
     lines = [
-        f"Mean over {n_seeds} seeds per task (score = grader score in [0, 1]; higher is better).",
+        f"Mean over {n_seeds} seeds per task (score = grader score in [0, 1]; improvement = share of the possible gain over doing nothing, 1 = perfect, <0 = worse than leaving the data alone).",
         "",
-        "| Agent | Task | Score (mean ± std) | Mean reward | Mean steps | Invalid-action rate | LLM fallbacks | API errors |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Agent | Task | Score (mean ± std) | Improvement (mean ± std) | Mean reward | Mean steps | Invalid-action rate | LLM fallbacks | API errors |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for r in summary.itertuples():
         lines.append(
-            f"| {r.agent} | {r.task_id} | {r.score_mean:.3f} ± {r.score_std:.3f} | {r.reward_mean:.2f} | "
+            f"| {r.agent} | {r.task_id} | {r.score_mean:.3f} ± {r.score_std:.3f} | {r.impr_mean:+.3f} ± {r.impr_std:.3f} | {r.reward_mean:.2f} | "
             f"{r.steps_mean:.1f} | {r.invalid_rate:.1%} | {int(r.fallbacks)} | {int(r.api_errors)} |"
         )
     return "\n".join(lines) + "\n"

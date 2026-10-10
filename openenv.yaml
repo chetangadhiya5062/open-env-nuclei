@@ -11,12 +11,12 @@ entry_point: data_cleaning_env.server.data_cleaning_env_environment:DataCleaning
 tasks:
   - id: easy-clean
     difficulty: easy
-    description: Dataset with only missing values in one column
+    description: Dataset with only missing values (numeric age and monthly_spend, categorical plan)
 
   - id: medium-clean
     difficulty: medium
-    description: Dataset with missing values and duplicate rows
+    description: Dataset with missing values in four columns and exact duplicate rows
 
   - id: hard-clean
     difficulty: hard
-    description: Dataset with missing values, duplicates, and inconsistent categorical values
+    description: Dataset with missing values, duplicates, inconsistent categories, wrong types, whitespace issues, outliers and mixed date formats

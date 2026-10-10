@@ -31,12 +31,24 @@ def test_truth_is_clean_and_dirty_is_not(task_id):
     assert len(truth) == TASKS[task_id].n_rows
 
 
-def test_easy_only_has_missing_ages():
+def test_easy_only_has_missing_values_in_three_columns():
     dirty, _ = generate("easy-clean", 3)
     issues = {c: i for c, i in detect_issues(dirty).items() if i}
-    assert set(issues) == {"age"}
-    assert set(issues["age"]) == {"missing"}
+    assert set(issues) == {"age", "monthly_spend", "plan"}
+    assert all(set(i) == {"missing"} for i in issues.values())
     assert dirty.duplicated().sum() == 0
+
+
+def test_do_nothing_scores_order_the_tasks_by_difficulty():
+    from data_cleaning_env.server.grader import grade
+
+    def mean_do_nothing(task_id):
+        scores = [grade(*generate(task_id, s))["score"] for s in range(5)]
+        return sum(scores) / len(scores)
+
+    easy, medium, hard = (mean_do_nothing(t) for t in ("easy-clean", "medium-clean", "hard-clean"))
+    assert 0.80 <= easy <= 0.88  # easy is no longer a near-perfect starting point
+    assert easy > medium > hard
 
 
 def test_medium_has_missing_and_duplicates_only():

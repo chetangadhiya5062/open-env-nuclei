@@ -29,6 +29,18 @@ from .quality import column_issues, is_number
 W_CELLS, W_ROWS, W_SCHEMA = 0.6, 0.2, 0.2
 
 
+def improvement(score: float, do_nothing_score: float) -> float:
+    """Share of the possible improvement achieved: 0 = no better than leaving the data alone, 1 = perfect.
+
+    ``(score - do_nothing) / (1 - do_nothing)``. Negative when the agent made the table worse than the untouched
+    one. If the untouched table is already perfect there is nothing to improve and the result is 0.0.
+    """
+    room = 1.0 - do_nothing_score
+    if room < 1e-9:
+        return 0.0
+    return (score - do_nothing_score) / room
+
+
 def _cell_score(pred, true, scale: float, numeric: bool) -> float:
     if pd.isna(pred):
         return 0.0

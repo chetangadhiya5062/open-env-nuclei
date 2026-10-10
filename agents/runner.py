@@ -59,6 +59,7 @@ class EpisodeResult:
     steps: int
     total_reward: float
     final_score: float
+    improvement: float
     quality_score: float
     invalid_actions: int
     fallbacks: int
@@ -94,6 +95,7 @@ def run_episode(
         steps=obs.step_count,
         total_reward=round(sum(rewards), 6),
         final_score=float(obs.final_score if obs.final_score is not None else 0.0),
+        improvement=float((obs.score_breakdown or {}).get("improvement", 0.0)),
         quality_score=obs.quality_score,
         invalid_actions=obs.invalid_action_count,
         fallbacks=agent.fallbacks,

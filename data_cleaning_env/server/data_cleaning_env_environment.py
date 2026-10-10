@@ -33,7 +33,7 @@ from ..models import ColumnProfile, DataCleaningAction, DataCleaningObservation,
 from ..schema import COLUMNS, ID_COLUMN, SCHEMA
 from . import operations
 from .datagen import generate, get_task
-from .grader import grade
+from .grader import grade, improvement
 from .quality import column_issues, duplicate_count, issue_cells, quality_score
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,7 @@ class DataCleaningEnvironment(Environment):
         self.cfg = cfg
         self.df, self.truth = generate(task_id, seed)
         self.initial_cells = len(self.df) * len(COLUMNS)
+        self.do_nothing_score = grade(self.df, self.truth)["score"]  # score if the agent finishes immediately
         self.quality = quality_score(self.df, self.initial_cells)
         self.present_ids = _truth_ids(self.df)
         self.invalid_actions = 0
@@ -145,6 +146,8 @@ class DataCleaningEnvironment(Environment):
         if finished or truncated:
             self.done = True
             self.final = grade(self.df, self.truth)
+            self.final["do_nothing_score"] = self.do_nothing_score
+            self.final["improvement"] = round(improvement(self.final["score"], self.do_nothing_score), 6)
             if truncated:
                 self.last_message += " (step budget exhausted, episode ended)"
             logger.info(

@@ -1,4 +1,4 @@
-"""LLM agent: an OpenAI-compatible chat model (default: Llama 3 8B via the Hugging Face router).
+"""LLM agent: an OpenAI-compatible chat model (default: Llama 3.1 8B via the Hugging Face router).
 
 Zero-shot prompting only: nothing is trained. Behaviour you can rely on:
 
@@ -28,7 +28,8 @@ from .base import Agent
 logger = logging.getLogger(__name__)
 
 DEFAULT_API_BASE_URL = "https://router.huggingface.co/v1"
-DEFAULT_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
+# The HF router no longer serves Meta-Llama-3-8B-Instruct; Llama 3.1 8B is the closest supported model.
+DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 HISTORY_LENGTH = 5
 
 SYSTEM_PROMPT = f"""You are a careful data-cleaning agent working on a pandas table, one action per turn.
