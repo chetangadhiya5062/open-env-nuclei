@@ -95,9 +95,11 @@ Mean grader score ± std and normalized improvement over 10 held-out test seeds 
 | random | 0.627 ± 0.140 (-1.558) | 0.605 ± 0.120 (-0.930) | 0.534 ± 0.058 (-0.189) | 27–31% |
 | rule-based (heuristic checklist) | **0.967 ± 0.006 (+0.774)** | **0.960 ± 0.004 (+0.806)** | **0.968 ± 0.003 (+0.918)** | 0.0% |
 | rl-ppo (400k steps, greedy policy) | 0.964 ± 0.006 (+0.755) | **0.960 ± 0.004 (+0.806)** | 0.967 ± 0.004 (+0.917) | 0.0% |
-| LLM (Llama 3.1 8B, zero-shot) | *not measured* | *not measured* | *not measured* | - |
+| LLM (Llama 3.1 8B, zero-shot) | 0.956 ± 0.012 (+0.698) | 0.959 ± 0.005 (+0.799) | 0.838 ± 0.037 (+0.586) | 0.0–4.0% |
 
 > **Normalized Improvement Metric:** `improvement = (score - do_nothing_score) / (1 - do_nothing_score)` for the same task and seed. 1.0 = perfect restoration, 0.0 = no gain over leaving the dirty data untouched, negative = degraded data quality.
+
+> **LLM Benchmark Notes:** Evaluated with zero-shot `Llama 3.1 8B` over 5 seeds per task (raw episodes and traces in [docs/benchmarks/llm_run/](docs/benchmarks/llm_run/)). The LLM substantially improves upon random and do-nothing baselines (+0.70 to +0.80 improvement on easy and medium). On `hard-clean`, it achieves 0.838 score (+0.586 improvement), trailing the rule-based agent and trained PPO policy. Analysis of `trace.jsonl` shows why: the LLM frequently attempts date transformations using dictionary mappings inside `standardize_categories` instead of calling `fix_dates`, occasionally confuses allowed category values across different columns, and runs through its entire step budget without issuing an early `finish`.
 
 ![benchmark chart](docs/benchmarks/scores.png)
 
@@ -187,7 +189,7 @@ docs/PHASE_NOTES.md  design notes and interview explanations
 ## Roadmap
 
 - [x] Train an RL policy (PPO with Stable-Baselines3, exported to NumPy for lightweight inference) and benchmark it against baselines.
-- [ ] LLM benchmark numbers in the table above (requires active Hugging Face inference quota or local Ollama endpoint).
+- [x] LLM benchmark numbers in the table above (Llama 3.1 8B evaluated across 5 seeds).
 - [ ] A harder variant where the allowed vocabulary is not given to the agent.
 - [ ] More schemas / real CSV datasets.
 
