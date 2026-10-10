@@ -374,3 +374,79 @@ When the do-nothing agent already scores 0.95, every agent looks great. Normalis
 "Raw scores bunch near 1 because most cells are already clean, so I added a normalised improvement metric that is 0 for
 leaving the data alone and 1 for perfect. I also made the easy task harder so the baseline sits around 0.85 instead of 0.95,
 and I added a test that pins the difficulty ordering so a future change can't silently flatten it."
+
+---
+
+## Part D - RL training (PPO)
+
+### What I changed
+- **Gymnasium wrapper (`agents/rl_env.py`):** In-process wrapper around the environment.
+  - Featurisation (`agents/rl_common.py`): 54-dimensional float32 vector containing per-column issue fractions (missing, wrong type, out of range, whitespace, not allowed value, bad date format, is object dtype) plus duplicate fraction, quality score $Q$, step fraction remaining, last action success, and row count ratio.
+  - Curated action space (19 discrete actions): standard operations (`drop_duplicates`, `strip_whitespace`, category standardizations, type casting, date normalization, clipping, column-specific missing value imputation) plus `finish` and `drop_rows_with_missing`. Includes `standardize_aliases:city` macro.
+  - Seed splits: training seeds $\ge 100$, validation seeds 50–59, held-out test seeds 0–9 (strictly disjoint).
+- **Training pipeline (`train_rl.py`):**
+  - Stable-Baselines3 PPO with 8 vectorized subprocess workers (`SubprocVecEnv`).
+  - Ran 400,000 steps on CPU (~29 minutes on 16-core system).
+  - Evaluated every 20,480 steps on held-out validation seeds 50–59 with greedy evaluation.
+  - Best checkpoint achieved at $t=401,408$: validation score 0.964 (easy), 0.959 (medium), 0.968 (hard), mean improvement 0.823.
+  - Plotted learning curve to `docs/benchmarks/learning_curve.png`.
+- **Pure NumPy inference (`agents/rl_agent.py`):**
+  - Model weights exported from PyTorch to `models/ppo_policy.npz` (37 kB) with metadata in `models/ppo_policy.json`.
+  - `NumpyPolicy` executes forward pass via tanh MLP matrix multiplication, removing PyTorch from production runtime dependencies.
+- **Benchmark verification (`benchmark.py`):**
+  - Ran benchmark across 10 held-out test seeds (seeds 0–9):
+    - `easy-clean`: 0.964 ± 0.006 (+0.755 improvement) vs rule-based 0.967 ± 0.006 (+0.774)
+    - `medium-clean`: 0.960 ± 0.004 (+0.806 improvement) vs rule-based 0.960 ± 0.004 (+0.806)
+    - `hard-clean`: 0.967 ± 0.004 (+0.917 improvement) vs rule-based 0.968 ± 0.003 (+0.918)
+    - Invalid-action rate: **0.0%** across all tasks and test seeds.
+
+### Why
+To fulfill the core project goal honestly: an agent that actually *learns* tabular data cleaning. Exporting to NumPy ensures the Hugging Face Space remains lightweight and fast on CPU without installing PyTorch or CUDA runtimes.
+
+### Interview explanation
+"I trained a PPO reinforcement learning agent in-process using an observation featurizer and a curated discrete action space. I trained on random seeds and evaluated on disjoint held-out seeds to ensure the policy generalizes rather than memorizing noise. On the hardest task, PPO reached 0.967 score (+0.917 normalized improvement), virtually matching the hand-crafted rule-based heuristic (+0.918) without any hardcoded if-else ordering, and committed zero invalid actions. Crucially, I exported the trained neural network to a plain NumPy matrix multiplication format so our live deployment runs CPU-only with zero PyTorch footprint."
+
+---
+
+## Part E - Deploy Hugging Face Space
+
+### What I did
+- **Deploy script (`scripts/deploy_space.py`):**
+  - Automatically isolates runtime files (`data_cleaning_env`, `agents`, `models`, `Dockerfile`, `requirements.txt`, `openenv.yaml`) into a clean temporary staging directory, excluding tests, `.venv`, `.git`, `.env`, and caches.
+  - Automatically converts `data_cleaning_env/README.md` (the YAML Space card) into the root `README.md` for the Space.
+  - Uses `huggingface_hub.HfApi().upload_folder` to publish to `chetangadhiya017/data-cleaning-env`.
+  - Supports `--dry-run` to preview package contents without uploading.
+- **Hygiene verification:** Added unit tests in `tests/test_hygiene.py` to ensure the deploy folder contains only runtime dependencies and correctly includes the YAML front-matter.
+- **Status:** Tested `--dry-run` successfully (29 files, 138 kB). Ready for live upload once the user authenticates via `hf auth login`.
+
+### Interview explanation
+"I automated the Hugging Face Space deployment with a Python script that stages only production runtime code and weights, excluding development caches, virtual environments, and secrets, ensuring clean and reproducible deployments."
+
+---
+
+## Part F - Wrap up
+
+### What I did
+- Updated `README.md` with:
+  - Benchmark table containing raw scores, standard deviations, and normalized improvement metrics for all agents across all tasks on held-out test seeds.
+  - Learning curve chart (`docs/benchmarks/learning_curve.png`) and training analysis.
+  - Updated task descriptions matching current noise generators.
+  - Honest disclosure of action-space engineering (the alias mapping macro).
+  - Checked off the RL training item on the project roadmap.
+  - Preserved original contributors (Chetan Gadhiya, Hil Kalathiya, Sahaj Saliya).
+- Updated `docs/RESUME.md` with completion of Part D and instructions for Part E.
+- Ensured all 97 tests pass and `ruff check .` / `ruff format --check .` are clean.
+
+### Updated Resume Bullet (v3)
+> Built an OpenEnv reinforcement learning environment for tabular data cleaning (Python, pandas, Pydantic, FastAPI, Gymnasium): seeded synthetic tasks with hidden ground truth, a 9-action typed space, potential-based shaped reward, and a separate 0–1 grader. Trained a PPO policy (Stable-Baselines3, 400k steps, 8 parallel workers) that achieved 0.967 score (+0.917 normalized improvement on hard-clean) matching hand-crafted heuristics with 0% invalid actions, exported to pure NumPy for lightweight CPU inference; 97 tests, CI, and Docker demo on Hugging Face Spaces.
+
+### Updated 60-Second Interview Pitch (v3)
+"I built an environment where agents learn to clean messy tabular datasets step by step following the OpenEnv API. I used synthetic seeded data with a hidden ground truth, typed Pydantic actions, and a potential-based reward function that provably prevents reward farming. To test it, I benchmarked random, do-nothing, rule-based, and trained reinforcement learning agents. I trained a PPO policy over 400k steps with 8 parallel environments, evaluating exclusively on held-out seeds. On our hard task, PPO learned to reach a 0.967 score—a 91.7% normalized improvement over doing nothing—matching our domain heuristic without hardcoded rules, and made zero invalid moves. I also exported the trained policy weights to pure NumPy, allowing the live FastAPI and Gradio demo to run without heavy PyTorch dependencies. The repo has 97 automated tests, strict linting, and honest evaluation against separate ground truth."
+
+---
+
+## Decisions I made for you (Parts D–F)
+1. Kept training strictly CPU-friendly using 8 parallel worker environments, completing 400k steps in under 30 minutes.
+2. Exported weights to `models/ppo_policy.npz` and `models/ppo_policy.json` so the runtime demo requires no PyTorch or CUDA dependencies.
+3. Left LLM row as 'not measured' in the README table to uphold the strict 'no invented numbers' ground rule while HF credits/endpoint remain unconfigured.
+
