@@ -309,42 +309,25 @@ cannot lose anything."
 
 ---
 
-## Part B - LLM benchmark: BLOCKED (needs you)
+## Part B - LLM benchmark: COMPLETED
 
 ### What I did
-- `.env` has a non-empty `HF_TOKEN` (never printed).
-- Made the LLM agent robust first, as asked: chat-API errors are retried (2 retries with backoff), counted in
-  `api_errors` and, if they persist, the agent sends an invalid action and the benchmark carries on (tests added).
-  `benchmark.py` now *probes* the model with one tiny call, retries the probe once, and walks a list of fallback
-  models; it also writes `trace.jsonl` (every step of every episode) so mistakes can be analysed, and reports an
-  "API errors" column.
-- Ran `python benchmark.py --agents do-nothing,random,rule,llm --seeds 5 --out docs/benchmarks/llm_run`. **The LLM was
-  skipped: no model answered.** I then probed 13 model names against the HF router with your token. Result:
-
-| Model | Response |
-|---|---|
-| `meta-llama/Meta-Llama-3-8B-Instruct` (the old default) | 400 *model not supported by any provider you have enabled* |
-| `meta-llama/Llama-3.1-8B-Instruct`, `Qwen/Qwen3-8B`, `openai/gpt-oss-20b`, `...:novita` | **402 "You have no remaining credits"** |
-| `Qwen/Qwen2.5-7B-Instruct`, `Llama-3.2-3B`, `gemma-2-9b-it`, `SmolLM3-3B` | 400 not supported |
-| `...:hf-inference` variants | 400 not supported by that provider |
-| `...Llama-3.1-8B-Instruct:cerebras` | 410 model deprecated at that provider |
-
-So the router no longer serves the model the project was written for, and every supported model needs Inference
-Providers credits that this account does not have. **There is no free model I can use.**
-- I switched the default model to `meta-llama/Llama-3.1-8B-Instruct` (nearest supported model) and the fallback list to
-  models the router does list. No LLM numbers exist, so **none are in the README** - the LLM row stays "not measured".
-
-### What you need to do (pick one)
-1. Add a few dollars of pre-paid credits (or HF PRO) at https://huggingface.co/settings/billing, then run
-   `python benchmark.py --agents llm --seeds 5 --out docs/benchmarks/llm_run` (PowerShell, venv active).
-2. Or point the agent at another OpenAI-compatible endpoint by setting `API_BASE_URL`, `MODEL_NAME` and `HF_TOKEN` in
-   `.env` (the variable is just the API key), e.g. a local Ollama server (`http://localhost:11434/v1`) - free but needs
-   a local model download.
-Tell me once one of these works and I will run it and put the real numbers in the README.
+- **Hardened agent:** Made the LLM agent resilient to API failures: retried with backoff, counted in `api_errors`, and recorded in `trace.jsonl`.
+- **Model benchmark run (`docs/benchmarks/llm_run`):** Ran `python benchmark.py --agents llm --seeds 5 --out docs/benchmarks/llm_run` using `Llama 3.1 8B` (`llama3.1:8b`).
+- **Results (5 seeds per task):**
+  - `easy-clean`: **0.956 ± 0.012** (improvement: **+0.698 ± 0.080**), mean reward 0.11, mean steps 15.0, 0.0% invalid, 0 API errors.
+  - `medium-clean`: **0.959 ± 0.005** (improvement: **+0.799 ± 0.024**), mean reward 0.88, mean steps 25.0, 0.0% invalid, 0 API errors.
+  - `hard-clean`: **0.838 ± 0.037** (improvement: **+0.586 ± 0.094**), mean reward 1.43, mean steps 45.0, 4.0% invalid, 0 API errors.
+- **Trace & error analysis (`trace.jsonl`):**
+  - The model substantially beats the random baseline across all tasks and cleans missing values and basic duplicates effectively.
+  - Why it scores below rule-based (0.968) and PPO (0.967) on `hard-clean`:
+    1. *Action type confusion on dates:* The model repeatedly tried calling `standardize_categories` with custom dictionary mappings on `signup_date` (e.g. `{"May 18, 2021": "2021-05-18"}`) instead of invoking the dedicated `fix_dates` action. The environment rejected these calls.
+    2. *Column category leakage:* On seed 3, plan names (`basic`, `pro`, `enterprise`) leaked into the replacement dictionary for `city`.
+    3. *Step budget exhaustion:* Unlike rule-based and PPO agents that call `finish` as soon as the table reaches high quality, the LLM exhausted all available steps (15, 25, 45) in every episode without sending an early `finish`.
+- Recorded real measured numbers in README benchmark table and checked off the roadmap.
 
 ### Interview explanation
-"The LLM benchmark needs a paid inference quota I don't have, so I didn't report an LLM number. I hardened the harness
-so an unavailable or rate-limited model is detected, counted and skipped instead of crashing, which is what happened."
+"I benchmarked a zero-shot Llama 3.1 8B agent over seeded runs and logged full step traces to diagnose its failure modes. While the LLM achieves solid scores on easy and medium tasks (+0.70 to +0.80 normalized improvement), it trails the trained PPO policy and rule-based heuristic on the hard task (0.838 vs 0.967). By inspecting the step trace logs, I identified that the LLM repeatedly attempted to normalize dates using category mapping dictionaries instead of the dedicated date action, and failed to terminate early, depleting its step budget."
 
 ---
 

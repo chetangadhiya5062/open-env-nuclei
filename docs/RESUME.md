@@ -22,7 +22,7 @@ Then tell Claude Code: "Read docs/RESUME.md and docs/BRIEF_2.md and continue fro
 | Brief part | Status |
 |---|---|
 | A - sync, CI check, branch list | **Done.** Only open item: `origin/v2` (fully merged) is not deleted - the tool guard blocked remote deletion. Run `git push origin --delete v2` yourself if you want it gone. Other remote branches (`chetan`, `dev`, `sahaj`, `feature/improve-agent`) are also fully merged; owner decides. |
-| B - LLM benchmark | **Blocked on you.** Every model on the HF router returns 402 "no remaining credits" (or 400 not supported). Add Inference Providers credits, or point `API_BASE_URL`/`MODEL_NAME` at another OpenAI-compatible endpoint (e.g. local Ollama) in `.env`. Harness is ready: `python benchmark.py --agents llm --seeds 5 --out docs/benchmarks/llm_run`. Details in PHASE_NOTES (Part B). |
+| B - LLM benchmark | **Done.** Evaluated zero-shot `Llama 3.1 8B` over 5 seeds: easy 0.956 (+0.698), medium 0.959 (+0.799), hard 0.838 (+0.586). Traces and episode breakdown saved in `docs/benchmarks/llm_run/`. |
 | C - improvement metric, harder easy task | **Done, tested** (do-nothing: easy 0.854, medium 0.795, hard 0.608). |
 | D - RL (PPO) | **Done, trained & benchmarked.** 400k steps completed, best validation mean improvement 0.823 at $t=401,408$. Exported to `models/ppo_policy.npz`, benchmarked on held-out test seeds 0–9: easy 0.964 (+0.755), medium 0.960 (+0.806), hard 0.967 (+0.917) with 0.0% invalid-action rate. |
 | E - deploy Space | **Script ready, not run.** `scripts/deploy_space.py` (dry run works). Needs you: `hf auth login` (paste a WRITE token at that prompt), then `python scripts/deploy_space.py`, then check `/health` and `/demo` on https://chetangadhiya017-data-cleaning-env.hf.space. |

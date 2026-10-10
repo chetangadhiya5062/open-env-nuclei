@@ -1,0 +1,16 @@
+agent,task_id,seed,steps,total_reward,final_score,improvement,quality_score,invalid_actions,fallbacks,api_errors
+llm:llama3.1:8b,easy-clean,0,15,0.1,0.957475,0.708161,1,0,0,0
+llm:llama3.1:8b,easy-clean,1,15,0.1,0.96926,0.789039,1,0,0,0
+llm:llama3.1:8b,easy-clean,2,15,0.1,0.961523,0.735942,1,0,0,0
+llm:llama3.1:8b,easy-clean,3,15,0.15,0.937721,0.572594,1,0,0,0
+llm:llama3.1:8b,easy-clean,4,15,0.1,0.95425,0.686029,1,0,0,0
+llm:llama3.1:8b,medium-clean,0,25,0.901656,0.961214,0.810484,1,0,0,0
+llm:llama3.1:8b,medium-clean,1,25,0.860248,0.956091,0.785452,1,0,0,0
+llm:llama3.1:8b,medium-clean,2,25,0.860249,0.954485,0.777605,1,0,0,0
+llm:llama3.1:8b,medium-clean,3,25,0.943064,0.966184,0.834768,1,0,0,0
+llm:llama3.1:8b,medium-clean,4,25,0.839545,0.95603,0.785154,1,0,0,0
+llm:llama3.1:8b,hard-clean,0,45,1.437011,0.864483,0.654202,0.928571,2,0,0
+llm:llama3.1:8b,hard-clean,1,45,1.314933,0.812099,0.520534,0.922078,4,0,0
+llm:llama3.1:8b,hard-clean,2,45,1.475972,0.812343,0.521156,0.922078,0,0,0
+llm:llama3.1:8b,hard-clean,3,45,1.677919,0.888948,0.716629,0.935065,1,0,0
+llm:llama3.1:8b,hard-clean,4,45,1.246102,0.809937,0.515017,0.922078,2,0,0
