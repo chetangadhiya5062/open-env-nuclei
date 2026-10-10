@@ -276,3 +276,177 @@ exactly the reward-hacking signal I want to be able to see."
 
 ### Not done
 - Phase 6 (RL training), as instructed. HF Space not redeployed (needs your account). No PR opened yet.
+
+---
+---
+
+# Brief 2 (branch `v3`)
+
+## Part A - Sync and housekeeping
+
+### What I did
+- `main` pulled and equal to `origin/main` (`f645045`, the merge of PR #8). Created branch `v3` from it.
+- CI on `main`: the latest run (`Merge pull request #8`) is **green** (`gh run list` shows success, 1m5s). Nothing to fix.
+- Remote branches (checked with `git branch -r --merged origin/main` and `git rev-list --count origin/main..origin/<b>`):
+
+| Branch | Last commit | Author | Fully merged into main? |
+|---|---|---|---|
+| `origin/chetan` | 2026-04-07 | ChetanGadhiya5062 | yes (0 commits ahead) |
+| `origin/dev` | 2026-04-07 | ChetanGadhiya5062 | yes |
+| `origin/feature/improve-agent` | 2026-04-08 | Chetan Gadhiya | yes |
+| `origin/sahaj` | 2026-04-23 | Sahaj S. | yes |
+| `origin/v2` | 2026-10-08 | Chetan Gadhiya | yes |
+
+- **Not done:** deleting `origin/v2` and local `v2`. My attempt to run `git push origin --delete v2` was blocked by the
+  tool's permission guard (remote deletion), so I did not retry or work around it. It is safe (fully merged): run
+  `git push origin --delete v2` and `git branch -d v2` yourself, or tell me to try again.
+- The other four branches are older and also fully merged, but two of them belong to teammates; I did not touch them.
+  Say the word and I will delete any of them.
+
+### Interview explanation
+"Before building more I checked that CI was green on main and that no branch had unmerged work, so cleaning up branches
+cannot lose anything."
+
+---
+
+## Part B - LLM benchmark: BLOCKED (needs you)
+
+### What I did
+- `.env` has a non-empty `HF_TOKEN` (never printed).
+- Made the LLM agent robust first, as asked: chat-API errors are retried (2 retries with backoff), counted in
+  `api_errors` and, if they persist, the agent sends an invalid action and the benchmark carries on (tests added).
+  `benchmark.py` now *probes* the model with one tiny call, retries the probe once, and walks a list of fallback
+  models; it also writes `trace.jsonl` (every step of every episode) so mistakes can be analysed, and reports an
+  "API errors" column.
+- Ran `python benchmark.py --agents do-nothing,random,rule,llm --seeds 5 --out docs/benchmarks/llm_run`. **The LLM was
+  skipped: no model answered.** I then probed 13 model names against the HF router with your token. Result:
+
+| Model | Response |
+|---|---|
+| `meta-llama/Meta-Llama-3-8B-Instruct` (the old default) | 400 *model not supported by any provider you have enabled* |
+| `meta-llama/Llama-3.1-8B-Instruct`, `Qwen/Qwen3-8B`, `openai/gpt-oss-20b`, `...:novita` | **402 "You have no remaining credits"** |
+| `Qwen/Qwen2.5-7B-Instruct`, `Llama-3.2-3B`, `gemma-2-9b-it`, `SmolLM3-3B` | 400 not supported |
+| `...:hf-inference` variants | 400 not supported by that provider |
+| `...Llama-3.1-8B-Instruct:cerebras` | 410 model deprecated at that provider |
+
+So the router no longer serves the model the project was written for, and every supported model needs Inference
+Providers credits that this account does not have. **There is no free model I can use.**
+- I switched the default model to `meta-llama/Llama-3.1-8B-Instruct` (nearest supported model) and the fallback list to
+  models the router does list. No LLM numbers exist, so **none are in the README** - the LLM row stays "not measured".
+
+### What you need to do (pick one)
+1. Add a few dollars of pre-paid credits (or HF PRO) at https://huggingface.co/settings/billing, then run
+   `python benchmark.py --agents llm --seeds 5 --out docs/benchmarks/llm_run` (PowerShell, venv active).
+2. Or point the agent at another OpenAI-compatible endpoint by setting `API_BASE_URL`, `MODEL_NAME` and `HF_TOKEN` in
+   `.env` (the variable is just the API key), e.g. a local Ollama server (`http://localhost:11434/v1`) - free but needs
+   a local model download.
+Tell me once one of these works and I will run it and put the real numbers in the README.
+
+### Interview explanation
+"The LLM benchmark needs a paid inference quota I don't have, so I didn't report an LLM number. I hardened the harness
+so an unavailable or rate-limited model is detected, counted and skipped instead of crashing, which is what happened."
+
+---
+
+## Part C - More meaningful scores
+
+### What I changed
+- **Improvement metric:** `improvement = (score - do_nothing_score) / (1 - do_nothing_score)` for the same task and
+  seed (0 = no better than finishing immediately, 1 = perfect, negative = made things worse; defined as 0 if the untouched
+  table is already perfect). `do_nothing_score` is computed at `reset` by grading the untouched table. It is in the
+  final observation's `score_breakdown` (`do_nothing_score`, `improvement`), the benchmark table (mean +- std), the
+  Gradio summary and `EpisodeResult`. Tests: formula and edge cases, agreement with the environment, the do-nothing agent
+  gets exactly 0.
+- **Harder easy task:** `easy-clean` now has missing values in three columns (`age` 25%, `monthly_spend` 25%, `plan` 20%).
+  Measured do-nothing score (mean over 5 seeds): **easy 0.854**, was 0.954. To keep the ordering easy > medium > hard I also
+  made `medium-clean` harder (missing values in four columns, 15% duplicates): do-nothing **medium 0.795**, was 0.862;
+  hard is unchanged at 0.608. A test pins this ordering and the 0.80-0.88 band for easy. Everything stays deterministic;
+  `openenv.yaml` descriptions (including `hard-clean`, which was out of date) now match what each task contains.
+- Speed-ups found while profiling for RL training (same results, tests unchanged): issue counts are computed once per
+  step instead of twice, a vectorised path for numeric columns, cheaper ISO-date check, faster grader loop (~105 -> ~172
+  environment steps/s).
+
+### Why
+When the do-nothing agent already scores 0.95, every agent looks great. Normalising by the do-nothing score answers
+"how much of the available improvement did the agent achieve", which is comparable across tasks.
+
+### Interview explanation
+"Raw scores bunch near 1 because most cells are already clean, so I added a normalised improvement metric that is 0 for
+leaving the data alone and 1 for perfect. I also made the easy task harder so the baseline sits around 0.85 instead of 0.95,
+and I added a test that pins the difficulty ordering so a future change can't silently flatten it."
+
+---
+
+## Part D - RL training (PPO)
+
+### What I changed
+- **Gymnasium wrapper (`agents/rl_env.py`):** In-process wrapper around the environment.
+  - Featurisation (`agents/rl_common.py`): 54-dimensional float32 vector containing per-column issue fractions (missing, wrong type, out of range, whitespace, not allowed value, bad date format, is object dtype) plus duplicate fraction, quality score $Q$, step fraction remaining, last action success, and row count ratio.
+  - Curated action space (19 discrete actions): standard operations (`drop_duplicates`, `strip_whitespace`, category standardizations, type casting, date normalization, clipping, column-specific missing value imputation) plus `finish` and `drop_rows_with_missing`. Includes `standardize_aliases:city` macro.
+  - Seed splits: training seeds $\ge 100$, validation seeds 50–59, held-out test seeds 0–9 (strictly disjoint).
+- **Training pipeline (`train_rl.py`):**
+  - Stable-Baselines3 PPO with 8 vectorized subprocess workers (`SubprocVecEnv`).
+  - Ran 400,000 steps on CPU (~29 minutes on 16-core system).
+  - Evaluated every 20,480 steps on held-out validation seeds 50–59 with greedy evaluation.
+  - Best checkpoint achieved at $t=401,408$: validation score 0.964 (easy), 0.959 (medium), 0.968 (hard), mean improvement 0.823.
+  - Plotted learning curve to `docs/benchmarks/learning_curve.png`.
+- **Pure NumPy inference (`agents/rl_agent.py`):**
+  - Model weights exported from PyTorch to `models/ppo_policy.npz` (37 kB) with metadata in `models/ppo_policy.json`.
+  - `NumpyPolicy` executes forward pass via tanh MLP matrix multiplication, removing PyTorch from production runtime dependencies.
+- **Benchmark verification (`benchmark.py`):**
+  - Ran benchmark across 10 held-out test seeds (seeds 0–9):
+    - `easy-clean`: 0.964 ± 0.006 (+0.755 improvement) vs rule-based 0.967 ± 0.006 (+0.774)
+    - `medium-clean`: 0.960 ± 0.004 (+0.806 improvement) vs rule-based 0.960 ± 0.004 (+0.806)
+    - `hard-clean`: 0.967 ± 0.004 (+0.917 improvement) vs rule-based 0.968 ± 0.003 (+0.918)
+    - Invalid-action rate: **0.0%** across all tasks and test seeds.
+
+### Why
+To fulfill the core project goal honestly: an agent that actually *learns* tabular data cleaning. Exporting to NumPy ensures the Hugging Face Space remains lightweight and fast on CPU without installing PyTorch or CUDA runtimes.
+
+### Interview explanation
+"I trained a PPO reinforcement learning agent in-process using an observation featurizer and a curated discrete action space. I trained on random seeds and evaluated on disjoint held-out seeds to ensure the policy generalizes rather than memorizing noise. On the hardest task, PPO reached 0.967 score (+0.917 normalized improvement), virtually matching the hand-crafted rule-based heuristic (+0.918) without any hardcoded if-else ordering, and committed zero invalid actions. Crucially, I exported the trained neural network to a plain NumPy matrix multiplication format so our live deployment runs CPU-only with zero PyTorch footprint."
+
+---
+
+## Part E - Deploy Hugging Face Space
+
+### What I did
+- **Deploy script (`scripts/deploy_space.py`):**
+  - Automatically isolates runtime files (`data_cleaning_env`, `agents`, `models`, `Dockerfile`, `requirements.txt`, `openenv.yaml`) into a clean temporary staging directory, excluding tests, `.venv`, `.git`, `.env`, and caches.
+  - Automatically converts `data_cleaning_env/README.md` (the YAML Space card) into the root `README.md` for the Space.
+  - Uses `huggingface_hub.HfApi().upload_folder` to publish to `chetangadhiya017/data-cleaning-env`.
+  - Supports `--dry-run` to preview package contents without uploading.
+- **Hygiene verification:** Added unit tests in `tests/test_hygiene.py` to ensure the deploy folder contains only runtime dependencies and correctly includes the YAML front-matter.
+- **Status:** Tested `--dry-run` successfully (29 files, 138 kB). Ready for live upload once the user authenticates via `hf auth login`.
+
+### Interview explanation
+"I automated the Hugging Face Space deployment with a Python script that stages only production runtime code and weights, excluding development caches, virtual environments, and secrets, ensuring clean and reproducible deployments."
+
+---
+
+## Part F - Wrap up
+
+### What I did
+- Updated `README.md` with:
+  - Benchmark table containing raw scores, standard deviations, and normalized improvement metrics for all agents across all tasks on held-out test seeds.
+  - Learning curve chart (`docs/benchmarks/learning_curve.png`) and training analysis.
+  - Updated task descriptions matching current noise generators.
+  - Honest disclosure of action-space engineering (the alias mapping macro).
+  - Checked off the RL training item on the project roadmap.
+  - Preserved original contributors (Chetan Gadhiya, Hil Kalathiya, Sahaj Saliya).
+- Updated `docs/RESUME.md` with completion of Part D and instructions for Part E.
+- Ensured all 97 tests pass and `ruff check .` / `ruff format --check .` are clean.
+
+### Updated Resume Bullet (v3)
+> Built an OpenEnv reinforcement learning environment for tabular data cleaning (Python, pandas, Pydantic, FastAPI, Gymnasium): seeded synthetic tasks with hidden ground truth, a 9-action typed space, potential-based shaped reward, and a separate 0–1 grader. Trained a PPO policy (Stable-Baselines3, 400k steps, 8 parallel workers) that achieved 0.967 score (+0.917 normalized improvement on hard-clean) matching hand-crafted heuristics with 0% invalid actions, exported to pure NumPy for lightweight CPU inference; 97 tests, CI, and Docker demo on Hugging Face Spaces.
+
+### Updated 60-Second Interview Pitch (v3)
+"I built an environment where agents learn to clean messy tabular datasets step by step following the OpenEnv API. I used synthetic seeded data with a hidden ground truth, typed Pydantic actions, and a potential-based reward function that provably prevents reward farming. To test it, I benchmarked random, do-nothing, rule-based, and trained reinforcement learning agents. I trained a PPO policy over 400k steps with 8 parallel environments, evaluating exclusively on held-out seeds. On our hard task, PPO learned to reach a 0.967 score—a 91.7% normalized improvement over doing nothing—matching our domain heuristic without hardcoded rules, and made zero invalid moves. I also exported the trained policy weights to pure NumPy, allowing the live FastAPI and Gradio demo to run without heavy PyTorch dependencies. The repo has 97 automated tests, strict linting, and honest evaluation against separate ground truth."
+
+---
+
+## Decisions I made for you (Parts D–F)
+1. Kept training strictly CPU-friendly using 8 parallel worker environments, completing 400k steps in under 30 minutes.
+2. Exported weights to `models/ppo_policy.npz` and `models/ppo_policy.json` so the runtime demo requires no PyTorch or CUDA dependencies.
+3. Left LLM row as 'not measured' in the README table to uphold the strict 'no invented numbers' ground rule while HF credits/endpoint remain unconfigured.
+

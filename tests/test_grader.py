@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from data_cleaning_env.server.datagen import generate
-from data_cleaning_env.server.grader import grade
+from data_cleaning_env.server.grader import grade, improvement
 
 
 @pytest.mark.parametrize("task_id", ["easy-clean", "medium-clean", "hard-clean"])
@@ -52,3 +52,36 @@ def test_text_in_numeric_column_scores_zero_for_those_cells():
     result = grade(bad, truth)
     assert result["schema_score"] < 1.0
     assert result["cell_accuracy"] < 1.0
+
+
+def test_improvement_formula_and_edge_cases():
+    assert improvement(1.0, 0.8) == pytest.approx(1.0)
+    assert improvement(0.8, 0.8) == pytest.approx(0.0)
+    assert improvement(0.9, 0.8) == pytest.approx(0.5)
+    assert improvement(0.6, 0.8) == pytest.approx(-1.0)  # worse than leaving the data alone
+    assert improvement(0.5, 1.0) == 0.0  # nothing to improve: no division by zero
+
+
+@pytest.mark.parametrize("task_id", ["easy-clean", "medium-clean", "hard-clean"])
+def test_final_observation_reports_improvement(task_id):
+    from agents import DoNothingAgent, LocalEnv, RuleBasedAgent, run_episode
+
+    env = LocalEnv()
+    nothing = run_episode(DoNothingAgent(), env, task_id, 0)
+    good = run_episode(RuleBasedAgent(), env, task_id, 0)
+    assert nothing.improvement == pytest.approx(0.0, abs=1e-6)  # finishing at once is the baseline by definition
+    assert 0.0 < good.improvement <= 1.0
+    _, truth = generate(task_id, 0)
+    dirty, _ = generate(task_id, 0)
+    assert good.improvement == pytest.approx(improvement(good.final_score, grade(dirty, truth)["score"]), abs=1e-5)
+
+
+def test_breakdown_exposes_baseline_and_improvement():
+    from agents.runner import LocalEnv
+    from data_cleaning_env.models import DataCleaningAction
+
+    env = LocalEnv()
+    env.reset("hard-clean", 1)
+    obs = env.step(DataCleaningAction(action_type="finish"))
+    assert {"score", "do_nothing_score", "improvement"} <= set(obs.score_breakdown)
+    assert obs.score_breakdown["improvement"] == pytest.approx(0.0, abs=1e-6)

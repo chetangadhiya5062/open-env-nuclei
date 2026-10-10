@@ -33,8 +33,8 @@ from ..models import ColumnProfile, DataCleaningAction, DataCleaningObservation,
 from ..schema import COLUMNS, ID_COLUMN, SCHEMA
 from . import operations
 from .datagen import generate, get_task
-from .grader import grade
-from .quality import column_issues, duplicate_count, issue_cells, quality_score
+from .grader import grade, improvement
+from .quality import detect_issues, duplicate_count, issue_cells, quality_score
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,8 @@ class DataCleaningEnvironment(Environment):
         self.cfg = cfg
         self.df, self.truth = generate(task_id, seed)
         self.initial_cells = len(self.df) * len(COLUMNS)
-        self.quality = quality_score(self.df, self.initial_cells)
+        self.do_nothing_score = grade(self.df, self.truth)["score"]  # score if the agent finishes immediately
+        self._refresh_quality()
         self.present_ids = _truth_ids(self.df)
         self.invalid_actions = 0
         self.done = False
@@ -134,7 +135,7 @@ class DataCleaningEnvironment(Environment):
             reward -= NOOP_PENALTY
 
         # potential-based shaping + data-destruction penalty
-        self.quality = quality_score(self.df, self.initial_cells)
+        self._refresh_quality()
         self.present_ids = _truth_ids(self.df)
         reward += SHAPING_SCALE * (self.quality - prev_q)
         reward -= LOSS_PENALTY * len(prev_ids - self.present_ids)
@@ -145,6 +146,8 @@ class DataCleaningEnvironment(Environment):
         if finished or truncated:
             self.done = True
             self.final = grade(self.df, self.truth)
+            self.final["do_nothing_score"] = self.do_nothing_score
+            self.final["improvement"] = round(improvement(self.final["score"], self.do_nothing_score), 6)
             if truncated:
                 self.last_message += " (step budget exhausted, episode ended)"
             logger.info(
@@ -159,6 +162,12 @@ class DataCleaningEnvironment(Environment):
         return self._state
 
     # ------------------------------------------------------------------ observation
+    def _refresh_quality(self) -> None:
+        """Recompute issues/duplicates/quality once per state change (reused by the reward and the observation)."""
+        self._issues = detect_issues(self.df)
+        self._dups = duplicate_count(self.df)
+        self.quality = quality_score(self.df, self.initial_cells, self._issues, self._dups)
+
     @staticmethod
     def _bad_values(col: pd.Series, spec) -> list:
         if spec.allowed is None:
@@ -178,7 +187,7 @@ class DataCleaningEnvironment(Environment):
                     missing=int(col.isna().sum()),
                     unique=int(col.nunique(dropna=True)),
                     sample_values=[str(v) for v in col.dropna().drop_duplicates().head(3).tolist()],
-                    issues=column_issues(col, spec),
+                    issues=self._issues[spec.name],
                     allowed_values=list(spec.allowed) if spec.allowed else None,
                     bad_values=self._bad_values(col, spec),
                     valid_range=[float(x) for x in spec.valid_range] if spec.valid_range else None,
@@ -193,7 +202,7 @@ class DataCleaningEnvironment(Environment):
             task_id=self.cfg.task_id,
             seed=self._state.seed,
             row_count=len(self.df),
-            duplicate_count=duplicate_count(self.df),
+            duplicate_count=self._dups,
             total_missing=int(self.df.isna().sum().sum()),
             columns=self._profile(),
             data_sample=sample,

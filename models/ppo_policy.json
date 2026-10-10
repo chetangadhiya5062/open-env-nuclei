@@ -1,0 +1,526 @@
+{
+  "algorithm": "PPO (stable-baselines3)",
+  "timesteps": 401408,
+  "seed": 0,
+  "hyperparameters": {
+    "n_envs": 8,
+    "n_steps": 256,
+    "batch_size": 128,
+    "n_epochs": 10,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "ent_coef": 0.02,
+    "learning_rate": 0.0003,
+    "net_arch": [
+      64,
+      64
+    ]
+  },
+  "train_seed_range": [
+    100,
+    100000
+  ],
+  "validation_seeds": [
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59
+  ],
+  "best_checkpoint_timesteps": 401408,
+  "best_validation_mean_improvement": 0.8233198,
+  "train_seconds": 1775.7,
+  "torch": "2.14.1+cpu",
+  "history": [
+    {
+      "timesteps": 8,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.8881086,
+          "improvement": 0.2321164,
+          "reward": -0.6428570000000002
+        },
+        "medium-clean": {
+          "score": 0.8295743999999999,
+          "improvement": 0.16726639999999998,
+          "reward": -1.345962600000001
+        },
+        "hard-clean": {
+          "score": 0.608104,
+          "improvement": 0.0,
+          "reward": -5.400000000000004
+        }
+      },
+      "mean_improvement": 0.13312759999999998
+    },
+    {
+      "timesteps": 20480,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.8883098,
+          "improvement": 0.23349709999999999,
+          "reward": -0.6428570000000002
+        },
+        "medium-clean": {
+          "score": 0.8557977999999998,
+          "improvement": 0.29539909999999997,
+          "reward": 0.11190439999999893
+        },
+        "hard-clean": {
+          "score": 0.6262860000000001,
+          "improvement": 0.046395000000000006,
+          "reward": -1.8285717000000017
+        }
+      },
+      "mean_improvement": 0.1917637333333333
+    },
+    {
+      "timesteps": 40960,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.8883098,
+          "improvement": 0.23349709999999999,
+          "reward": -0.6428570000000002
+        },
+        "medium-clean": {
+          "score": 0.8557977999999998,
+          "improvement": 0.29539909999999997,
+          "reward": 0.11190439999999893
+        },
+        "hard-clean": {
+          "score": 0.679532,
+          "improvement": 0.182263,
+          "reward": -2.3999997
+        }
+      },
+      "mean_improvement": 0.23705306666666667
+    },
+    {
+      "timesteps": 61440,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9256672,
+          "improvement": 0.48987189999999997,
+          "reward": -0.3071430000000001
+        },
+        "medium-clean": {
+          "score": 0.8537144000000001,
+          "improvement": 0.2852192,
+          "reward": -0.07443060000000087
+        },
+        "hard-clean": {
+          "score": 0.8159429999999999,
+          "improvement": 0.5303422,
+          "reward": 0.9281820999999999
+        }
+      },
+      "mean_improvement": 0.43514443333333336
+    },
+    {
+      "timesteps": 81920,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.8567487,
+          "improvement": 0.634466,
+          "reward": 3.1371684999999996
+        }
+      },
+      "mean_improvement": 0.7245398333333334
+    },
+    {
+      "timesteps": 102400,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.8560138,
+          "improvement": 0.6325907000000001,
+          "reward": 2.5229347
+        }
+      },
+      "mean_improvement": 0.7239147333333334
+    },
+    {
+      "timesteps": 122880,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.8949957999999999,
+          "improvement": 0.7320612000000001,
+          "reward": 2.6978297000000038
+        }
+      },
+      "mean_improvement": 0.7570715666666668
+    },
+    {
+      "timesteps": 143360,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.8989758999999999,
+          "improvement": 0.7422170000000001,
+          "reward": 2.9242065000000035
+        }
+      },
+      "mean_improvement": 0.7604568333333335
+    },
+    {
+      "timesteps": 163840,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9137758,
+          "improvement": 0.7799819000000001,
+          "reward": 3.4875440000000024
+        }
+      },
+      "mean_improvement": 0.7730451333333335
+    },
+    {
+      "timesteps": 184320,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9372330000000002,
+          "improvement": 0.8398376000000001,
+          "reward": 4.202245100000001
+        }
+      },
+      "mean_improvement": 0.7929970333333335
+    },
+    {
+      "timesteps": 204800,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9328043000000001,
+          "improvement": 0.8285371000000001,
+          "reward": 3.817141200000002
+        }
+      },
+      "mean_improvement": 0.7892302000000001
+    },
+    {
+      "timesteps": 225280,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9634395,
+          "improvement": 0.749094,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9566227999999999,
+          "improvement": 0.7880502,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9622406,
+          "improvement": 0.9036494000000002,
+          "reward": 5.358063200000002
+        }
+      },
+      "mean_improvement": 0.8135978666666667
+    },
+    {
+      "timesteps": 245760,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9671968,
+          "improvement": 0.7748796,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9622406,
+          "improvement": 0.9036494000000002,
+          "reward": 5.414063200000002
+        }
+      },
+      "mean_improvement": 0.8224020666666668
+    },
+    {
+      "timesteps": 266240,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9671968,
+          "improvement": 0.7748796,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9566227999999999,
+          "improvement": 0.7880502,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9620692,
+          "improvement": 0.9032121,
+          "reward": 5.435063200000001
+        }
+      },
+      "mean_improvement": 0.8220473
+    },
+    {
+      "timesteps": 286720,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9619974000000001,
+          "improvement": 0.9030289,
+          "reward": 5.4350632
+        }
+      },
+      "mean_improvement": 0.8140608
+    },
+    {
+      "timesteps": 307200,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9620244000000001,
+          "improvement": 0.9030978000000001,
+          "reward": 5.435063200000001
+        }
+      },
+      "mean_improvement": 0.8140837666666668
+    },
+    {
+      "timesteps": 327680,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9671968,
+          "improvement": 0.7748796,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9620692,
+          "improvement": 0.9032121,
+          "reward": 5.435063200000001
+        }
+      },
+      "mean_improvement": 0.8222562999999999
+    },
+    {
+      "timesteps": 348160,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9634395,
+          "improvement": 0.749094,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9589523999999999,
+          "improvement": 0.7994332,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9620692,
+          "improvement": 0.9032121,
+          "reward": 5.435063200000001
+        }
+      },
+      "mean_improvement": 0.8172464333333332
+    },
+    {
+      "timesteps": 368640,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9566227999999999,
+          "improvement": 0.7880502,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9620692,
+          "improvement": 0.9032121,
+          "reward": 5.435063200000001
+        }
+      },
+      "mean_improvement": 0.8139128666666666
+    },
+    {
+      "timesteps": 389120,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9567511,
+          "improvement": 0.7886772000000001,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.9620692,
+          "improvement": 0.9032121,
+          "reward": 5.435063200000001
+        }
+      },
+      "mean_improvement": 0.8141218666666669
+    },
+    {
+      "timesteps": 401408,
+      "metrics": {
+        "easy-clean": {
+          "score": 0.9636408999999999,
+          "improvement": 0.7504763000000001,
+          "reward": 1.9200000000000004
+        },
+        "medium-clean": {
+          "score": 0.9590808000000001,
+          "improvement": 0.8000605999999999,
+          "reward": 3.2630224000000005
+        },
+        "hard-clean": {
+          "score": 0.968422,
+          "improvement": 0.9194224999999999,
+          "reward": 5.435063200000001
+        }
+      },
+      "mean_improvement": 0.8233198
+    }
+  ],
+  "baselines_validation": {
+    "do-nothing": {
+      "easy-clean": {
+        "score": 0.8542859999999999,
+        "improvement": 0.0
+      },
+      "medium-clean": {
+        "score": 0.795342,
+        "improvement": 0.0
+      },
+      "hard-clean": {
+        "score": 0.608104,
+        "improvement": 0.0
+      }
+    },
+    "random": {
+      "easy-clean": {
+        "score": 0.6497168,
+        "improvement": -1.4039088999999998
+      },
+      "medium-clean": {
+        "score": 0.6248959000000001,
+        "improvement": -0.8328337000000001
+      },
+      "hard-clean": {
+        "score": 0.5503534,
+        "improvement": -0.1473621
+      }
+    },
+    "rule-based": {
+      "easy-clean": {
+        "score": 0.9671968,
+        "improvement": 0.7748796
+      },
+      "medium-clean": {
+        "score": 0.9589523999999999,
+        "improvement": 0.7994332
+      },
+      "hard-clean": {
+        "score": 0.9685319,
+        "improvement": 0.9197028999999999
+      }
+    }
+  }
+}

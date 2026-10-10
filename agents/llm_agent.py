@@ -1,4 +1,4 @@
-"""LLM agent: an OpenAI-compatible chat model (default: Llama 3 8B via the Hugging Face router).
+"""LLM agent: an OpenAI-compatible chat model (default: Llama 3.1 8B via the Hugging Face router).
 
 Zero-shot prompting only: nothing is trained. Behaviour you can rely on:
 
@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import time
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
@@ -27,7 +28,8 @@ from .base import Agent
 logger = logging.getLogger(__name__)
 
 DEFAULT_API_BASE_URL = "https://router.huggingface.co/v1"
-DEFAULT_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
+# The HF router no longer serves Meta-Llama-3-8B-Instruct; Llama 3.1 8B is the closest supported model.
+DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 HISTORY_LENGTH = 5
 
 SYSTEM_PROMPT = f"""You are a careful data-cleaning agent working on a pandas table, one action per turn.
@@ -127,6 +129,10 @@ def validate_reply(text: str) -> DataCleaningAction:
     return action
 
 
+class LLMCallError(RuntimeError):
+    """The chat API call failed (network, rate limit, unknown model, ...) after retries."""
+
+
 class LLMAgent(Agent):
     name = "llm"
 
@@ -136,10 +142,14 @@ class LLMAgent(Agent):
         model: Optional[str] = None,
         max_retries: int = 2,
         temperature: float = 0.0,
+        api_retries: int = 2,
+        retry_sleep: float = 2.0,
     ) -> None:
         self.model = model or os.getenv("MODEL_NAME", DEFAULT_MODEL)
         self.max_retries = max_retries
         self.temperature = temperature
+        self.api_retries = api_retries
+        self.retry_sleep = retry_sleep
         self._client = client
         self._history: Deque[str] = deque(maxlen=HISTORY_LENGTH)
         self._last: Optional[Tuple[str, str]] = None
@@ -167,11 +177,30 @@ class LLMAgent(Agent):
         self.llm_calls = 0
 
     def _complete(self, messages: List[Dict[str, str]]) -> str:
-        self.llm_calls += 1
-        resp = self._get_client().chat.completions.create(
-            model=self.model, messages=messages, temperature=self.temperature, max_tokens=400
-        )
-        return resp.choices[0].message.content or ""
+        last_exc: Optional[Exception] = None
+        for attempt in range(self.api_retries + 1):
+            self.llm_calls += 1
+            try:
+                resp = self._get_client().chat.completions.create(
+                    model=self.model, messages=messages, temperature=self.temperature, max_tokens=400
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as exc:  # network, 4xx/5xx, rate limit: never crash the episode
+                last_exc = exc
+                logger.warning(
+                    "LLM API error (attempt %d/%d): %s", attempt + 1, self.api_retries + 1, type(exc).__name__
+                )
+                if attempt < self.api_retries:
+                    time.sleep(self.retry_sleep * (attempt + 1))
+        raise LLMCallError(f"{type(last_exc).__name__}: {last_exc}")
+
+    def probe(self) -> Optional[str]:
+        """One tiny call to check that the model answers. Returns None if OK, else the error text."""
+        try:
+            self._complete([{"role": "user", "content": 'Reply with the JSON {"ok": true}.'}])
+            return None
+        except LLMCallError as exc:
+            return str(exc)
 
     def _record_previous(self, obs: DataCleaningObservation) -> None:
         if self._last is not None:
@@ -186,7 +215,12 @@ class LLMAgent(Agent):
         ]
         last_error = ""
         for attempt in range(self.max_retries + 1):
-            reply = self._complete(messages)
+            try:
+                reply = self._complete(messages)
+            except LLMCallError as exc:
+                self.api_errors += 1
+                last_error = str(exc)
+                break
             try:
                 action = validate_reply(reply)
                 self._last = (json.dumps(action.to_payload()), "")
@@ -202,8 +236,6 @@ class LLMAgent(Agent):
                     }
                 )
         self.fallbacks += 1
-        logger.warning(
-            "LLM fallback #%d: sending an invalid action after %d failed attempts", self.fallbacks, self.max_retries + 1
-        )
+        logger.warning("LLM fallback #%d: sending an invalid action (%s)", self.fallbacks, last_error[:120])
         self._last = ("invalid_llm_output", last_error)
         return DataCleaningAction(action_type="invalid_llm_output")

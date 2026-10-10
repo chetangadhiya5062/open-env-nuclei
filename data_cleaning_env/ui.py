@@ -16,9 +16,11 @@ STEP_COLUMNS = ["step", "action", "reward", "quality", "result"]
 
 def available_agents() -> Dict[str, object]:
     """Agent name -> factory. The LLM agent is only offered when HF_TOKEN is configured."""
-    from agents import DoNothingAgent, LLMAgent, RandomAgent, RuleBasedAgent
+    from agents import DoNothingAgent, LLMAgent, RandomAgent, RLAgent, RuleBasedAgent
 
     agents = {"rule-based": RuleBasedAgent, "random": RandomAgent, "do-nothing": DoNothingAgent}
+    if RLAgent.available():
+        agents["rl-ppo"] = RLAgent
     if LLMAgent.available():
         agents["llm"] = LLMAgent
     return agents
@@ -62,7 +64,7 @@ def run_demo(
 
     b = obs.score_breakdown or {}
     summary = (
-        f"**Done.** Grader score **{obs.final_score:.3f}** "
+        f"**Done.** Grader score **{obs.final_score:.3f}** (improvement over doing nothing **{b.get('improvement', 0):+.3f}**) "
         f"(cells {b.get('cell_accuracy', 0):.3f}, rows {b.get('row_fidelity', 0):.3f}, "
         f"schema {b.get('schema_score', 0):.3f}) | total reward {obs.total_reward:.2f} | "
         f"{obs.step_count} steps | invalid actions {obs.invalid_action_count}"

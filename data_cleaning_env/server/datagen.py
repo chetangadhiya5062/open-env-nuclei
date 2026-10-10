@@ -97,8 +97,8 @@ TASKS: Dict[str, TaskConfig] = {
             "easy",
             n_rows=40,
             max_steps=15,
-            description="Dataset with only missing values in one column",
-            missing={"age": 0.2},
+            description="Dataset with only missing values (numeric age and monthly_spend, categorical plan)",
+            missing={"age": 0.25, "monthly_spend": 0.25, "plan": 0.20},
         ),
         TaskConfig(
             "medium-clean",
@@ -106,9 +106,9 @@ TASKS: Dict[str, TaskConfig] = {
             "medium",
             n_rows=60,
             max_steps=25,
-            description="Dataset with missing values and duplicate rows",
-            missing={"age": 0.15, "monthly_spend": 0.12, "city": 0.10},
-            dup_rate=0.12,
+            description="Dataset with missing values in four columns and exact duplicate rows",
+            missing={"age": 0.25, "monthly_spend": 0.20, "city": 0.20, "plan": 0.10},
+            dup_rate=0.15,
         ),
         TaskConfig(
             "hard-clean",

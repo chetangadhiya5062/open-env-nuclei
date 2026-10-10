@@ -124,3 +124,38 @@ def test_llm_prompt_contains_history_and_last_error():
     second_user_prompt = client.calls[1][1]["content"]
     assert "REJECTED" in second_user_prompt and "Recent actions" in second_user_prompt
     json.loads(first_obs().model_dump_json())  # observation is JSON-serialisable
+
+
+class FailingClient:
+    """Every call raises, like an unknown model or a rate limit."""
+
+    def __init__(self):
+        self.calls = 0
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def _create(self, **kwargs):
+        self.calls += 1
+        raise RuntimeError("429 rate limited")
+
+
+def test_llm_api_errors_are_retried_counted_and_do_not_crash_the_episode():
+    client = FailingClient()
+    agent = LLMAgent(client=client, model="x/test", api_retries=1, retry_sleep=0)
+    action = agent.act(first_obs())
+    assert action.action_type == "invalid_llm_output"
+    assert client.calls == 2 and agent.api_errors == 1 and agent.fallbacks == 1
+    assert agent.probe() is not None  # probe reports the error instead of raising
+
+
+def test_llm_recovers_after_a_transient_api_error():
+    replies = [RuntimeError("503"), '{"action_type":"finish"}']
+
+    class Flaky(FakeClient):
+        def _create(self, **kwargs):
+            r = self.replies.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=r))])
+
+    agent = LLMAgent(client=Flaky(replies), model="x/test", api_retries=2, retry_sleep=0)
+    assert agent.act(first_obs()).action_type == "finish" and agent.api_errors == 0

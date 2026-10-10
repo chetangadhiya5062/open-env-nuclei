@@ -7,12 +7,18 @@ from agents.runner import LocalEnv
 from data_cleaning_env.server import data_cleaning_env_environment as E
 from tests.conftest import act
 
-CLEAN_EASY = [act(action_type="fill_missing", column_name="age", strategy="median")]
+CLEAN_EASY = [
+    act(action_type="fill_missing", column_name="age", strategy="median"),
+    act(action_type="fill_missing", column_name="monthly_spend", strategy="median"),
+    act(action_type="fill_missing", column_name="plan", strategy="mode"),
+]
 
 
 def clean_easy(env):
     env.reset(task_id="easy-clean", seed=0)
-    return env.step(CLEAN_EASY[0])
+    for action in CLEAN_EASY:
+        obs = env.step(action)
+    return obs
 
 
 def test_reward_is_per_step_not_cumulative(env):

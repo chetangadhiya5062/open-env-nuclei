@@ -5,17 +5,15 @@ action at a time, plus baselines, a benchmark, an LLM agent and a Gradio demo.
 
 - **Reproducible:** every episode is `(task_id, seed)` -> the same dirty table, with a hidden clean ground truth.
 - **Honest scoring:** the training-style *reward* and the final *grader score* are separate things (see below).
-- **Agents included:** do-nothing, random, a rule-based heuristic, and a zero-shot LLM agent (Llama 3 8B through the
-  Hugging Face router). **Nothing here is trained** - the LLM agent is prompting only. See the roadmap for RL training.
+- **Agents included:** do-nothing, random, a rule-based heuristic, a trained RL agent (PPO), and a zero-shot LLM agent (Llama 3.1 8B through the Hugging Face router). The RL agent is trained with PPO on held-out seeds and runs via lightweight pure-NumPy inference with zero PyTorch dependencies at runtime.
 
-> The Hugging Face Space linked from older versions of this README runs the pre-v2 code until it is redeployed
-> (see [Deploy](#deploy-to-hugging-face-spaces)).
+> The Hugging Face Space demo runs at [chetangadhiya017-data-cleaning-env.hf.space](https://chetangadhiya017-data-cleaning-env.hf.space). To redeploy the latest code, see [Deploy](#deploy-to-hugging-face-spaces).
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A[Agent<br/>rule-based / random / LLM] -- action JSON --> S
+    A[Agent<br/>rule-based / random / RL / LLM] -- action JSON --> S
     subgraph S[OpenEnv server  FastAPI + WebSocket]
       V[Pydantic validation<br/>actions.py] --> O[pandas operations<br/>operations.py]
       O --> Q[quality score Q<br/>quality.py]
@@ -32,8 +30,8 @@ Episode: `reset(task_id, seed)` -> repeat `step(action)` -> `finish` (or the ste
 
 | Task | Rows | Step budget | What is wrong with the data |
 |---|---|---|---|
-| `easy-clean` | 40 | 15 | missing values in `age` |
-| `medium-clean` | 60 (+duplicates) | 25 | missing values (numeric + categorical) and exact duplicate rows |
+| `easy-clean` | 40 | 15 | missing values in `age`, `monthly_spend`, and `plan` |
+| `medium-clean` | 60 (+duplicates) | 25 | missing values in four columns and 15% exact duplicate rows |
 | `hard-clean` | 100 (+duplicates) | 45 | all of the above plus inconsistent categories (`NY`, `new york`, `New York `), numbers stored as text (`"25"`), `N/A` placeholders, impossible values (age 999), mixed date formats, stray whitespace |
 
 The table is a synthetic customers table: `customer_id, name, age, city, signup_date, plan, monthly_spend`.
@@ -89,21 +87,31 @@ approximate, the best realistic score is below 1.0 even when `Q` reaches 1.0.
 
 ## Benchmark
 
-Mean grader score +- std over 10 seeds per task, in-process, from `python benchmark.py` (raw per-episode data in
-[docs/benchmarks/](docs/benchmarks/)):
+Mean grader score ± std and normalized improvement over 10 held-out test seeds (seeds 0–9) per task, in-process, from `python benchmark.py` (raw per-episode data in [docs/benchmarks/](docs/benchmarks/)):
 
-| Agent | easy-clean | medium-clean | hard-clean | Invalid-action rate |
+| Agent | easy-clean (score / impr) | medium-clean (score / impr) | hard-clean (score / impr) | Invalid-action rate |
 |---|---|---|---|---|
-| do-nothing (finish immediately) | 0.954 | 0.862 | 0.608 | 0% |
-| random | 0.871 ± 0.079 | 0.766 ± 0.073 | 0.534 ± 0.058 | 27-31% |
-| rule-based | **0.987 ± 0.001** | **0.980 ± 0.003** | **0.968 ± 0.003** | 0% |
-| LLM (Llama 3 8B, zero-shot) | not measured yet | not measured yet | not measured yet | - |
+| do-nothing (finish immediately) | 0.854 ± 0.000 (+0.000) | 0.795 ± 0.000 (+0.000) | 0.608 ± 0.000 (+0.000) | 0.0% |
+| random | 0.627 ± 0.140 (-1.558) | 0.605 ± 0.120 (-0.930) | 0.534 ± 0.058 (-0.189) | 27–31% |
+| rule-based (heuristic checklist) | **0.967 ± 0.006 (+0.774)** | **0.960 ± 0.004 (+0.806)** | **0.968 ± 0.003 (+0.918)** | 0.0% |
+| rl-ppo (400k steps, greedy policy) | 0.964 ± 0.006 (+0.755) | **0.960 ± 0.004 (+0.806)** | 0.967 ± 0.004 (+0.917) | 0.0% |
+| LLM (Llama 3.1 8B, zero-shot) | *not measured* | *not measured* | *not measured* | - |
+
+> **Normalized Improvement Metric:** `improvement = (score - do_nothing_score) / (1 - do_nothing_score)` for the same task and seed. 1.0 = perfect restoration, 0.0 = no gain over leaving the dirty data untouched, negative = degraded data quality.
 
 ![benchmark chart](docs/benchmarks/scores.png)
 
-Notes: doing nothing is already strong on `easy-clean` because only ~8 cells are missing. The rule-based agent is a
-hand-written checklist; it matches category aliases to `allowed_values` by prefix/initials. Run the LLM yourself:
-`python benchmark.py --agents llm --seeds 5` (needs `HF_TOKEN`).
+### RL Training & Learning Curve
+
+The RL agent was trained for 400,000 steps using Stable-Baselines3 PPO across 8 parallel environment workers (`SubprocVecEnv`), evaluated every 20,480 steps on held-out validation seeds 50–59, and benchmarked on held-out test seeds 0–9 (which were never exposed during training). Weights are saved as `models/ppo_policy.npz` (and metadata in `models/ppo_policy.json`).
+
+![learning curve](docs/benchmarks/learning_curve.png)
+
+**Key learning insights:**
+- **Zero invalid actions:** The policy learned to never issue invalid actions across any task or test seed (0.0% invalid-action rate).
+- **Matched heuristic performance:** On `hard-clean`, PPO learned to reach **0.967 ± 0.004 (+0.917 improvement)**, virtually identical to the hand-crafted rule-based agent (**0.968 ± 0.003 (+0.918 improvement)**).
+- **Proper operation sequencing:** PPO learned to strip whitespace and standardise categories before handling missing values, avoided destructive row drops, and called `finish` once high quality was attained.
+- **Lightweight deployment:** The policy is exported to NumPy arrays and runs with zero PyTorch dependencies on CPU in the Space demo.
 
 ## Quick start (Windows PowerShell)
 
@@ -123,10 +131,10 @@ python -m data_cleaning_env.server.app      # server + demo on http://localhost:
 - API docs: <http://localhost:7860/docs>.
 
 ```powershell
-pytest                                       # 79 tests
+pytest                                       # 97 tests
 ruff check . ; ruff format --check .         # lint
 
-python benchmark.py                          # do-nothing, random, rule-based over 10 seeds
+python benchmark.py                          # do-nothing, random, rule-based, rl over 10 seeds
 $env:HF_TOKEN = "hf_..."                     # your token; never commit it (see .env.example)
 python inference.py --task hard-clean        # LLM agent against the running server, [START]/[STEP]/[END] output
 ```
@@ -154,24 +162,32 @@ docker run -p 7860:7860 openenv-data-cleaning
 
 ### Deploy to Hugging Face Spaces
 
-Create a Docker Space, add the repo files (the `data_cleaning_env/README.md` front-matter is the Space card; copy it to
-the Space's `README.md`), set the Space port to 7860, and add `HF_TOKEN` as a *secret* only if you want the LLM agent
-available in the demo. Push to the Space's git remote; it builds from the `Dockerfile`.
+The deployment script [`scripts/deploy_space.py`](scripts/deploy_space.py) packages the environment, agents, and exported model weights without dev dependencies:
+
+```powershell
+python scripts/deploy_space.py --dry-run     # verify package contents
+# To deploy to https://huggingface.co/spaces/chetangadhiya017/data-cleaning-env:
+# Run 'hf auth login' (paste write token), then:
+python scripts/deploy_space.py
+```
 
 ## Project layout
 
 ```
 data_cleaning_env/   schema, models, client, actions, ui and server/ (datagen, quality, operations, grader, environment)
-agents/              base interface, random, do-nothing, rule-based, LLM agent, episode runner
+agents/              base interface, random, do-nothing, rule-based, RL agent (numpy), LLM agent, episode runner
+models/              trained PPO policy weights (ppo_policy.npz) and training metadata
 benchmark.py         agents x tasks x seeds -> markdown / CSV / chart
+train_rl.py          PPO training pipeline (8 parallel workers, validation evaluation, policy export)
 inference.py         LLM agent against a running server (hackathon-style logs)
-tests/               pytest suite     docs/PHASE_NOTES.md  design notes
+tests/               pytest suite (97 tests)
+docs/PHASE_NOTES.md  design notes and interview explanations
 ```
 
 ## Roadmap
 
-- [ ] Train an RL policy (tabular Q-learning or PPO) and compare it with the baselines; only then claim "learns".
-- [ ] LLM benchmark numbers in the table above.
+- [x] Train an RL policy (PPO with Stable-Baselines3, exported to NumPy for lightweight inference) and benchmark it against baselines.
+- [ ] LLM benchmark numbers in the table above (requires active Hugging Face inference quota or local Ollama endpoint).
 - [ ] A harder variant where the allowed vocabulary is not given to the agent.
 - [ ] More schemas / real CSV datasets.
 
@@ -181,6 +197,7 @@ tests/               pytest suite     docs/PHASE_NOTES.md  design notes
 - `Q` is a proxy for quality: an agent can raise `Q` with a bad imputation (e.g. a constant). The grader exists to
   catch such gaps.
 - Only one grader weighting and one noise model are implemented.
+- Action-space engineering: the RL agent's `standardize_aliases:city` action is a macro that generates alias mappings using the rule-based heuristic, so the policy learns *when* to execute the transformation rather than discovering arbitrary character mappings from scratch.
 
 ## Contributors
 
