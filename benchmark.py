@@ -1,13 +1,14 @@
 """Benchmark agents on every task over several seeds.
 
 Examples (PowerShell):
-    python benchmark.py                                  # random + rule-based + do-nothing, 10 seeds
+    python benchmark.py                                  # do-nothing, random, rule-based, rl; 10 seeds
     python benchmark.py --agents random,rule --seeds 20
     $env:HF_TOKEN = "hf_..."; python benchmark.py --agents llm --seeds 5   # LLM only
 
 Outputs (default folder ``benchmark_results/``): ``episodes.csv`` (one row per episode),
 ``results.md`` (summary table) and ``scores.png`` (bar chart of mean score +/- std).
-Agents that need an API key are skipped, with a warning, when HF_TOKEN is missing.
+Agents that need an API key (llm) or a trained model (rl) are skipped, with a warning, when missing.
+Seeds 0..N-1 are the held-out test seeds: the RL agent never trained on them.
 """
 
 import argparse
@@ -21,7 +22,7 @@ from typing import Callable, Dict, List, Optional
 import pandas as pd
 from dotenv import load_dotenv
 
-from agents import DoNothingAgent, LLMAgent, LocalEnv, RandomAgent, RemoteEnv, RuleBasedAgent, run_episode
+from agents import DoNothingAgent, LLMAgent, LocalEnv, RandomAgent, RemoteEnv, RLAgent, RuleBasedAgent, run_episode
 from agents.base import Agent
 from agents.llm_agent import DEFAULT_MODEL
 from data_cleaning_env.server.datagen import TASKS
@@ -33,9 +34,10 @@ AGENT_FACTORIES: Dict[str, Callable[[], Agent]] = {
     "random": RandomAgent,
     "rule": RuleBasedAgent,
     "llm": LLMAgent,
+    "rl": RLAgent,
 }
 FALLBACK_LLM_MODELS = ["openai/gpt-oss-20b", "Qwen/Qwen3-8B"]
-DEFAULT_AGENTS = ["do-nothing", "random", "rule"]
+DEFAULT_AGENTS = ["do-nothing", "random", "rule", "rl"]
 
 
 def make_agent(key: str, args) -> Optional[Agent]:
@@ -160,6 +162,9 @@ def main(argv: List[str] = None) -> int:
             if agent_key not in AGENT_FACTORIES:
                 logger.error("unknown agent %r (choose from %s)", agent_key, sorted(AGENT_FACTORIES))
                 return 2
+            if agent_key == "rl" and not RLAgent.available():
+                logger.warning("skipping 'rl': no trained model at models/ppo_policy.npz (run train_rl.py)")
+                continue
             if agent_key == "llm" and not LLMAgent.available():
                 logger.warning("skipping 'llm': HF_TOKEN is not set")
                 continue

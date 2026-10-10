@@ -27,8 +27,8 @@ from data_cleaning_env.server.datagen import TASKS
 logger = logging.getLogger("train_rl")
 
 HYPERPARAMS = dict(
-    n_envs=4,
-    n_steps=512,
+    n_envs=8,
+    n_steps=256,
     batch_size=128,
     n_epochs=10,
     gamma=0.99,
@@ -37,6 +37,14 @@ HYPERPARAMS = dict(
     learning_rate=3e-4,
     net_arch=[64, 64],
 )
+
+
+def make_env():
+    """Module-level factory so it can be pickled for subprocess workers (Windows uses spawn)."""
+    from stable_baselines3.common.monitor import Monitor
+
+    logging.getLogger("data_cleaning_env").setLevel(logging.WARNING)
+    return Monitor(DataCleaningGymEnv())
 
 
 def evaluate(predict, seeds=VALIDATION_SEEDS) -> Dict[str, Dict[str, float]]:
@@ -131,18 +139,18 @@ def main() -> int:
     parser.add_argument("--curve", default="docs/benchmarks/learning_curve.png")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("data_cleaning_env").setLevel(logging.WARNING)
 
     import torch
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import BaseCallback
-    from stable_baselines3.common.monitor import Monitor
     from stable_baselines3.common.utils import set_random_seed
-    from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+    from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 
     set_random_seed(args.seed)
     torch.set_num_threads(max(1, min(4, torch.get_num_threads())))
     hp = HYPERPARAMS
-    venv = DummyVecEnv([lambda: Monitor(DataCleaningGymEnv()) for _ in range(hp["n_envs"])])
+    venv = SubprocVecEnv([make_env for _ in range(hp["n_envs"])])
     venv.seed(args.seed)
     venv = VecNormalize(venv, norm_obs=False, norm_reward=True, gamma=hp["gamma"])
     model = PPO(

@@ -276,3 +276,101 @@ exactly the reward-hacking signal I want to be able to see."
 
 ### Not done
 - Phase 6 (RL training), as instructed. HF Space not redeployed (needs your account). No PR opened yet.
+
+---
+---
+
+# Brief 2 (branch `v3`)
+
+## Part A - Sync and housekeeping
+
+### What I did
+- `main` pulled and equal to `origin/main` (`f645045`, the merge of PR #8). Created branch `v3` from it.
+- CI on `main`: the latest run (`Merge pull request #8`) is **green** (`gh run list` shows success, 1m5s). Nothing to fix.
+- Remote branches (checked with `git branch -r --merged origin/main` and `git rev-list --count origin/main..origin/<b>`):
+
+| Branch | Last commit | Author | Fully merged into main? |
+|---|---|---|---|
+| `origin/chetan` | 2026-04-07 | ChetanGadhiya5062 | yes (0 commits ahead) |
+| `origin/dev` | 2026-04-07 | ChetanGadhiya5062 | yes |
+| `origin/feature/improve-agent` | 2026-04-08 | Chetan Gadhiya | yes |
+| `origin/sahaj` | 2026-04-23 | Sahaj S. | yes |
+| `origin/v2` | 2026-10-08 | Chetan Gadhiya | yes |
+
+- **Not done:** deleting `origin/v2` and local `v2`. My attempt to run `git push origin --delete v2` was blocked by the
+  tool's permission guard (remote deletion), so I did not retry or work around it. It is safe (fully merged): run
+  `git push origin --delete v2` and `git branch -d v2` yourself, or tell me to try again.
+- The other four branches are older and also fully merged, but two of them belong to teammates; I did not touch them.
+  Say the word and I will delete any of them.
+
+### Interview explanation
+"Before building more I checked that CI was green on main and that no branch had unmerged work, so cleaning up branches
+cannot lose anything."
+
+---
+
+## Part B - LLM benchmark: BLOCKED (needs you)
+
+### What I did
+- `.env` has a non-empty `HF_TOKEN` (never printed).
+- Made the LLM agent robust first, as asked: chat-API errors are retried (2 retries with backoff), counted in
+  `api_errors` and, if they persist, the agent sends an invalid action and the benchmark carries on (tests added).
+  `benchmark.py` now *probes* the model with one tiny call, retries the probe once, and walks a list of fallback
+  models; it also writes `trace.jsonl` (every step of every episode) so mistakes can be analysed, and reports an
+  "API errors" column.
+- Ran `python benchmark.py --agents do-nothing,random,rule,llm --seeds 5 --out docs/benchmarks/llm_run`. **The LLM was
+  skipped: no model answered.** I then probed 13 model names against the HF router with your token. Result:
+
+| Model | Response |
+|---|---|
+| `meta-llama/Meta-Llama-3-8B-Instruct` (the old default) | 400 *model not supported by any provider you have enabled* |
+| `meta-llama/Llama-3.1-8B-Instruct`, `Qwen/Qwen3-8B`, `openai/gpt-oss-20b`, `...:novita` | **402 "You have no remaining credits"** |
+| `Qwen/Qwen2.5-7B-Instruct`, `Llama-3.2-3B`, `gemma-2-9b-it`, `SmolLM3-3B` | 400 not supported |
+| `...:hf-inference` variants | 400 not supported by that provider |
+| `...Llama-3.1-8B-Instruct:cerebras` | 410 model deprecated at that provider |
+
+So the router no longer serves the model the project was written for, and every supported model needs Inference
+Providers credits that this account does not have. **There is no free model I can use.**
+- I switched the default model to `meta-llama/Llama-3.1-8B-Instruct` (nearest supported model) and the fallback list to
+  models the router does list. No LLM numbers exist, so **none are in the README** - the LLM row stays "not measured".
+
+### What you need to do (pick one)
+1. Add a few dollars of pre-paid credits (or HF PRO) at https://huggingface.co/settings/billing, then run
+   `python benchmark.py --agents llm --seeds 5 --out docs/benchmarks/llm_run` (PowerShell, venv active).
+2. Or point the agent at another OpenAI-compatible endpoint by setting `API_BASE_URL`, `MODEL_NAME` and `HF_TOKEN` in
+   `.env` (the variable is just the API key), e.g. a local Ollama server (`http://localhost:11434/v1`) - free but needs
+   a local model download.
+Tell me once one of these works and I will run it and put the real numbers in the README.
+
+### Interview explanation
+"The LLM benchmark needs a paid inference quota I don't have, so I didn't report an LLM number. I hardened the harness
+so an unavailable or rate-limited model is detected, counted and skipped instead of crashing, which is what happened."
+
+---
+
+## Part C - More meaningful scores
+
+### What I changed
+- **Improvement metric:** `improvement = (score - do_nothing_score) / (1 - do_nothing_score)` for the same task and
+  seed (0 = no better than finishing immediately, 1 = perfect, negative = made things worse; defined as 0 if the untouched
+  table is already perfect). `do_nothing_score` is computed at `reset` by grading the untouched table. It is in the
+  final observation's `score_breakdown` (`do_nothing_score`, `improvement`), the benchmark table (mean +- std), the
+  Gradio summary and `EpisodeResult`. Tests: formula and edge cases, agreement with the environment, the do-nothing agent
+  gets exactly 0.
+- **Harder easy task:** `easy-clean` now has missing values in three columns (`age` 25%, `monthly_spend` 25%, `plan` 20%).
+  Measured do-nothing score (mean over 5 seeds): **easy 0.854**, was 0.954. To keep the ordering easy > medium > hard I also
+  made `medium-clean` harder (missing values in four columns, 15% duplicates): do-nothing **medium 0.795**, was 0.862;
+  hard is unchanged at 0.608. A test pins this ordering and the 0.80-0.88 band for easy. Everything stays deterministic;
+  `openenv.yaml` descriptions (including `hard-clean`, which was out of date) now match what each task contains.
+- Speed-ups found while profiling for RL training (same results, tests unchanged): issue counts are computed once per
+  step instead of twice, a vectorised path for numeric columns, cheaper ISO-date check, faster grader loop (~105 -> ~172
+  environment steps/s).
+
+### Why
+When the do-nothing agent already scores 0.95, every agent looks great. Normalising by the do-nothing score answers
+"how much of the available improvement did the agent achieve", which is comparable across tasks.
+
+### Interview explanation
+"Raw scores bunch near 1 because most cells are already clean, so I added a normalised improvement metric that is 0 for
+leaving the data alone and 1 for perfect. I also made the easy task harder so the baseline sits around 0.85 instead of 0.95,
+and I added a test that pins the difficulty ordering so a future change can't silently flatten it."

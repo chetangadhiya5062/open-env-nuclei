@@ -16,9 +16,11 @@ STEP_COLUMNS = ["step", "action", "reward", "quality", "result"]
 
 def available_agents() -> Dict[str, object]:
     """Agent name -> factory. The LLM agent is only offered when HF_TOKEN is configured."""
-    from agents import DoNothingAgent, LLMAgent, RandomAgent, RuleBasedAgent
+    from agents import DoNothingAgent, LLMAgent, RandomAgent, RLAgent, RuleBasedAgent
 
     agents = {"rule-based": RuleBasedAgent, "random": RandomAgent, "do-nothing": DoNothingAgent}
+    if RLAgent.available():
+        agents["rl-ppo"] = RLAgent
     if LLMAgent.available():
         agents["llm"] = LLMAgent
     return agents

@@ -55,3 +55,17 @@ def test_secrets_are_not_hardcoded():
     )
     assert ".env" in _read(".gitignore").splitlines()
     assert (ROOT / ".env.example").exists()
+
+
+def test_space_deploy_folder_is_clean_and_uses_the_space_card(tmp_path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("deploy_space", ROOT / "scripts" / "deploy_space.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    files = module.build_deploy_folder(tmp_path / "space")
+    assert "Dockerfile" in files and "requirements.txt" in files and "data_cleaning_env/server/app.py" in files
+    assert not [f for f in files if f.startswith(("tests/", ".venv/", ".git/", ".github/", "docs/")) or f == ".env"]
+    assert not [f for f in files if "__pycache__" in f or f.endswith(".pyc")]
+    readme = (tmp_path / "space" / "README.md").read_text(encoding="utf-8")
+    assert readme.startswith("---\n") and "app_port: 7860" in readme and "sdk: docker" in readme
