@@ -63,12 +63,13 @@ def grade(df: pd.DataFrame, truth: pd.DataFrame) -> Dict[str, float]:
     scales = {c.name: max(float(truth[c.name].std(ddof=0)), 1e-9) for c in SCHEMA if c.is_numeric}
     total = 0.0
     matched = 0
-    for _, true_row in truth.iterrows():
+    pred_rows = df.to_dict("records")
+    for true_row in truth.to_dict("records"):
         pos = first_row_for_id.get(int(true_row[ID_COLUMN]))
         if pos is None:
             continue
         matched += 1
-        pred_row = df.iloc[pos]
+        pred_row = pred_rows[pos]
         for spec in SCHEMA:
             if spec.name not in df.columns:
                 continue
