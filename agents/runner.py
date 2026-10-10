@@ -62,6 +62,7 @@ class EpisodeResult:
     quality_score: float
     invalid_actions: int
     fallbacks: int
+    api_errors: int = 0
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -96,4 +97,5 @@ def run_episode(
         quality_score=obs.quality_score,
         invalid_actions=obs.invalid_action_count,
         fallbacks=agent.fallbacks,
+        api_errors=agent.api_errors,
     )
