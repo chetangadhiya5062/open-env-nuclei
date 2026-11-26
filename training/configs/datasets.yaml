@@ -1,0 +1,33 @@
+# python -m training.build_datasets
+env:
+  tasks: [easy-clean, medium-clean, hard-clean]
+  # [start, end) seed ranges. test 0-9 = benchmark.py test seeds; 50-59 = PPO validation seeds (train_rl.py).
+  # No range overlaps another (the builder checks it).
+  seeds:
+    test: [0, 10]
+    val: [60, 90]
+    train: [100, 700]
+    grpo_val: [1000, 1030]
+    grpo_train: [1100, 1500]
+  sft:
+    seed: 7
+    perturb_prob: 0.5        # share of episodes that start with random actions
+    max_random_actions: 3
+  grpo:
+    seed: 11
+    perturb_prob: 0.6
+    max_random_actions: 3
+    max_train_prompts: 4000
+    max_val_prompts: 300
+
+tabular:                     # messy tables for training/fe_benchmark.py (featureforge.samples)
+  churn: {train_rows: 20000, train_seed: 101, holdout_rows: 5000, holdout_seed: 202}
+  housing: {train_rows: 20000, train_seed: 103, holdout_rows: 5000, holdout_seed: 204}
+  transactions: {train_rows: 50000, train_seed: 105, holdout_rows: 10000, holdout_seed: 206}
+
+smoke:
+  env:
+    seeds: {test: [0, 10], val: [60, 61], train: [100, 102], grpo_val: [1000, 1001], grpo_train: [1100, 1102]}
+    grpo: {max_train_prompts: 20, max_val_prompts: 5}
+  tabular:
+    churn: {train_rows: 300, train_seed: 101, holdout_rows: 100, holdout_seed: 202}

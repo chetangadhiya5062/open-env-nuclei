@@ -1,0 +1,20 @@
+# python -m training.evaluate_llm --config training/configs/eval_llm.yaml --set adapter=training/runs/sft/<run>/adapter
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct   # base model of the adapter
+adapter: null                        # LoRA adapter folder; null = zero-shot base model
+label: null                          # name in the results table (default: run folder name)
+device: auto
+seed: 0
+tasks: [easy-clean, medium-clean, hard-clean]
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]   # held-out test seeds (same as benchmark.py)
+max_retries: 2
+max_new_tokens: 128
+
+smoke:
+  model: {name: tiny-offline}
+  data_dir: training/runs/smoke_datasets
+  device: cpu
+  tasks: [easy-clean]
+  seeds: [0]
+  max_retries: 0
+  max_new_tokens: 8

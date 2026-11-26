@@ -1,0 +1,29 @@
+# docker compose up --build
+#   FeatureForge API + dashboard: http://localhost:8000/ui   (API docs: /docs)
+#   OpenEnv data-cleaning environment + demo: http://localhost:7860
+services:
+  featureforge:
+    build:
+      context: .
+      dockerfile: docker/featureforge.Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      FF_MAX_UPLOAD_MB: ${FF_MAX_UPLOAD_MB:-200}
+      FF_PROFILE_SAMPLE_ROWS: ${FF_PROFILE_SAMPLE_ROWS:-50000}
+      FF_MAX_FIT_ROWS: ${FF_MAX_FIT_ROWS:-20000}
+      FF_LOG_LEVEL: ${FF_LOG_LEVEL:-INFO}
+      FF_API_KEY: ${FF_API_KEY:-}
+      FF_RUN_TTL_HOURS: ${FF_RUN_TTL_HOURS:-72}
+    volumes:
+      - ff_data:/data
+    restart: unless-stopped
+
+  env-server:
+    build: .
+    ports:
+      - "7860:7860"
+    restart: unless-stopped
+
+volumes:
+  ff_data:

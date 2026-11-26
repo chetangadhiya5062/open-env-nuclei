@@ -1,0 +1,26 @@
+# python -m training.fe_benchmark --config training/configs/fe_benchmark.yaml
+seed: 42
+data_dir: null                 # default training/datasets
+datasets: [churn, housing, transactions]
+tasks: {churn: classification, housing: regression, transactions: classification}
+variants: [minimal, clean, standard, full]
+models: [hgb, linear]
+folds: 5
+# Known leaks removed from every variant so the comparison is fair. (featureforge's profiler flags and auto mode
+# drops cancellation_reason on its own; the 'minimal' baseline would otherwise score a fake ROC-AUC of ~1.0.)
+exclude_columns: {churn: [cancellation_reason]}
+max_rows: null                 # subsample the train file (null = all rows)
+hgb_params: {max_iter: 300, learning_rate: 0.05}
+tune:
+  enabled: false               # true: Optuna-tune the hgb model per dataset x variant (slow; CPU)
+  n_trials: 30
+  inner_folds: 3
+
+smoke:
+  data_dir: training/runs/smoke_datasets
+  datasets: [churn]
+  variants: [minimal, standard]
+  models: [hgb]
+  folds: 2
+  hgb_params: {max_iter: 20}
+  tune: {enabled: true, n_trials: 1, inner_folds: 2}

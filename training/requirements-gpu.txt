@@ -1,0 +1,19 @@
+# GPU training stack, on top of the project itself:
+#   pip install -e ".[dev]"
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124   # pick the CUDA build matching the driver
+#   pip install -r training/requirements-gpu.txt
+# Versions below are the ones the CPU smoke tests passed with (2026-11-27). Newer minor versions usually work.
+transformers==5.24.1
+trl==1.19.0
+peft==0.22.0
+accelerate==1.16.0
+datasets==5.2.0
+tokenizers==0.23.3
+optuna==5.1.0
+stable-baselines3==2.9.0
+gymnasium==1.4.0
+tensorboard>=2.16
+# optional, Linux + CUDA only:
+#   bitsandbytes>=0.45   (QLoRA: --set model.load_in_4bit=true)
+#   vllm                 (faster GRPO generation: --set train.use_vllm=true)
+#   flash-attn           (--set model.attn_implementation=flash_attention_2)

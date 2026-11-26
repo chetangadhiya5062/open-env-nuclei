@@ -1,0 +1,195 @@
+{
+  "created_by": "python -m training.build_datasets",
+  "config": {
+    "env": {
+      "tasks": [
+        "easy-clean",
+        "medium-clean",
+        "hard-clean"
+      ],
+      "seeds": {
+        "test": [
+          0,
+          10
+        ],
+        "val": [
+          60,
+          90
+        ],
+        "train": [
+          100,
+          700
+        ],
+        "grpo_val": [
+          1000,
+          1030
+        ],
+        "grpo_train": [
+          1100,
+          1500
+        ]
+      },
+      "sft": {
+        "seed": 7,
+        "perturb_prob": 0.5,
+        "max_random_actions": 3
+      },
+      "grpo": {
+        "seed": 11,
+        "perturb_prob": 0.6,
+        "max_random_actions": 3,
+        "max_train_prompts": 4000,
+        "max_val_prompts": 300
+      }
+    },
+    "tabular": {
+      "churn": {
+        "train_rows": 20000,
+        "train_seed": 101,
+        "holdout_rows": 5000,
+        "holdout_seed": 202
+      },
+      "housing": {
+        "train_rows": 20000,
+        "train_seed": 103,
+        "holdout_rows": 5000,
+        "holdout_seed": 204
+      },
+      "transactions": {
+        "train_rows": 50000,
+        "train_seed": 105,
+        "holdout_rows": 10000,
+        "holdout_seed": 206
+      }
+    },
+    "smoke": {
+      "env": {
+        "seeds": {
+          "test": [
+            0,
+            10
+          ],
+          "val": [
+            60,
+            61
+          ],
+          "train": [
+            100,
+            102
+          ],
+          "grpo_val": [
+            1000,
+            1001
+          ],
+          "grpo_train": [
+            1100,
+            1102
+          ]
+        },
+        "grpo": {
+          "max_train_prompts": 20,
+          "max_val_prompts": 5
+        }
+      },
+      "tabular": {
+        "churn": {
+          "train_rows": 300,
+          "train_seed": 101,
+          "holdout_rows": 100,
+          "holdout_seed": 202
+        }
+      }
+    }
+  },
+  "git_commit": "bc836fe2413eb6d08f4e824f124aeb0a8f2d1132",
+  "files": [
+    {
+      "path": "env_seeds.json",
+      "bytes": 312,
+      "sha256": "65997092faa5e737cb3de6d22078bec1012a7d8065bb648db299ae72bb15a428",
+      "rows": null,
+      "kind": "seeds",
+      "description": "seed splits"
+    },
+    {
+      "path": "sft/train.jsonl.gz",
+      "bytes": 1580401,
+      "sha256": "7f5fa1e13be572b01fc8acc66a71b674c488ba48667adc21d29402528a436af2",
+      "rows": 14398,
+      "kind": "sft",
+      "description": "expert (rule-based) actions, env seeds [100, 700]"
+    },
+    {
+      "path": "sft/val.jsonl.gz",
+      "bytes": 80907,
+      "sha256": "5d823dd472de06abf2089b7e9f2ed9155307043d02ddd7aa8d996814cfa385d0",
+      "rows": 722,
+      "kind": "sft",
+      "description": "expert (rule-based) actions, env seeds [60, 90]"
+    },
+    {
+      "path": "grpo/train.jsonl.gz",
+      "bytes": 549941,
+      "sha256": "c52ab0936ab30a1d2a0e401ad74457ea23585d03b636d9c6529057d52498daf1",
+      "rows": 4000,
+      "kind": "grpo",
+      "description": "prompt states with replayable prefix, env seeds [1100, 1500]"
+    },
+    {
+      "path": "grpo/val.jsonl.gz",
+      "bytes": 43156,
+      "sha256": "2f5980d31c47e9bb9c02589fb00c13ef67839be2bc7f91f5f1419a7adb5f09c3",
+      "rows": 300,
+      "kind": "grpo",
+      "description": "prompt states with replayable prefix, env seeds [1000, 1030]"
+    },
+    {
+      "path": "tabular/churn_train.parquet",
+      "bytes": 427435,
+      "sha256": "efd721a02b8bed0f442230e1cbc5cdc57805475e8ae1a1d006cec71bb203fc29",
+      "rows": 20600,
+      "kind": "tabular",
+      "description": "churn (train), target 'churned', generator seed 101"
+    },
+    {
+      "path": "tabular/churn_holdout.parquet",
+      "bytes": 128994,
+      "sha256": "743eef3a7d13c87e996a737ab2c124bf91b4dc90481385095a7b7ee84a1620e0",
+      "rows": 5150,
+      "kind": "tabular",
+      "description": "churn (holdout), target 'churned', generator seed 202"
+    },
+    {
+      "path": "tabular/housing_train.parquet",
+      "bytes": 495950,
+      "sha256": "edaee9461b0e2d67aef2442cd7d6a8c2d9afa506a36c89fa85fbe87851db7c7b",
+      "rows": 20400,
+      "kind": "tabular",
+      "description": "housing (train), target 'price', generator seed 103"
+    },
+    {
+      "path": "tabular/housing_holdout.parquet",
+      "bytes": 141094,
+      "sha256": "ba7e5dc95e93a38edb188974a926e2985d34e9f4ab1ff27292a9d5ecafdf141a",
+      "rows": 5100,
+      "kind": "tabular",
+      "description": "housing (holdout), target 'price', generator seed 204"
+    },
+    {
+      "path": "tabular/transactions_train.parquet",
+      "bytes": 1195329,
+      "sha256": "1515bc9b29a6954d02b48779cece0ecaefdac4a635aba5e264055bd5d365963e",
+      "rows": 50500,
+      "kind": "tabular",
+      "description": "transactions (train), target 'is_fraud', generator seed 105"
+    },
+    {
+      "path": "tabular/transactions_holdout.parquet",
+      "bytes": 253035,
+      "sha256": "46999a3eebecd44a2b9ab0ffd72bd8fccf3a15eecca196441b2d9c82faf9d1d6",
+      "rows": 10100,
+      "kind": "tabular",
+      "description": "transactions (holdout), target 'is_fraud', generator seed 206"
+    }
+  ]
+}
