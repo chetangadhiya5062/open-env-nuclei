@@ -173,7 +173,10 @@ class GenerationParams(_P):
     max_group_cardinality: int = Field(50, ge=2)
     stage1_keep: int = Field(40, ge=1, description="candidates kept by the coarse MI screen")
     max_new: int = Field(10, ge=1, description="at most this many features are added")
-    min_gain: float = Field(0.002, ge=0, description="minimum relative residual-MSE reduction to keep a candidate")
+    min_gain: float = Field(0.01, ge=0, description="minimum relative residual-MSE reduction to keep a candidate")
+    base_model: Literal["gbm", "linear"] = Field(
+        "gbm", description="model whose residuals candidates must explain; use 'linear' for linear downstream models"
+    )
     n_folds: int = Field(3, ge=2, le=10)
 
 
@@ -251,8 +254,18 @@ class FeatureGeneration(Step):
         # stage 2: feature boosting on residuals of a base model
         X = sdf[numeric].astype(float)
         yv, discrete = _target_codes(sdf[ctx.target], ctx)
+        if self.params.base_model == "linear":
+            from sklearn.linear_model import LogisticRegression, Ridge
+            from sklearn.pipeline import make_pipeline
+            from sklearn.preprocessing import StandardScaler
+
+            X = X.fillna(X.median()).fillna(0.0)
         if discrete:
-            model = HistGradientBoostingClassifier(max_iter=100, random_state=ctx.random_state)
+            model = (
+                make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+                if self.params.base_model == "linear"
+                else HistGradientBoostingClassifier(max_iter=100, random_state=ctx.random_state)
+            )
             n_classes = len(np.unique(yv))
             min_count = int(np.bincount(yv.astype(int)).min())
             folds = max(2, min(self.params.n_folds, min_count))
@@ -260,7 +273,11 @@ class FeatureGeneration(Step):
             onehot = np.eye(n_classes)[yv.astype(int)]
             resid = onehot - proba
         else:
-            model = HistGradientBoostingRegressor(max_iter=100, random_state=ctx.random_state)
+            model = (
+                make_pipeline(StandardScaler(), Ridge(alpha=1.0))
+                if self.params.base_model == "linear"
+                else HistGradientBoostingRegressor(max_iter=100, random_state=ctx.random_state)
+            )
             pred = cross_val_predict(model, X, yv, cv=self.params.n_folds)
             resid = (yv - pred).reshape(-1, 1)
         rng = np.random.default_rng(ctx.random_state)
