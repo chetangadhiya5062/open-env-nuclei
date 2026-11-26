@@ -3,6 +3,9 @@
 This document lists the papers and tools that shaped the FeatureForge library (`featureforge/`) and the GPU training
 plan (`training/`). For each one: what it says, **what we implement**, and **why** (or why not).
 
+Local copies of every source (open PDFs, documentation snapshots, and citation notes for paywalled papers and books)
+are in [docs/references/](references/INDEX.md), with links, access notes and the code that uses each one.
+
 Status keys: **Implemented** = in the code and tested. **Simplified** = the idea is implemented in a cheaper form
 (stated how). **Not implemented** = read and deliberately left out, with the reason.
 
@@ -34,6 +37,10 @@ Generation with Expert-level Performance.* ICML 2023, PMLR 202:41880–41901. ar
   the top `stage1_keep`. Stage 2 (fine): fit a base gradient-boosting model, take its out-of-fold residuals, fit a
   depth-limited booster on each candidate alone against the residual and keep candidates that reduce the held-out
   residual error. Only the formulas are stored in the pipeline, so `transform` recomputes them on new data.
+  `base_model: gbm` (default, as in OpenFE) or `linear`: a gradient-boosting base model already approximates
+  products of its inputs, so with `gbm` the step correctly adds little on such data; with `linear` it finds the
+  interactions a linear downstream model is missing (tested: it recovers `a*b` first on `y = a*b + noise`, and adds
+  nothing on pure noise).
 - **Why:** this is the part of OpenFE that matters for a product: a principled, cheap screen that does not need a
   full model refit per candidate. We do not port OpenFE's full operator set or its successive-halving schedule (cost).
 
@@ -129,9 +136,11 @@ Liu, F. T., Ting, K. M., & Zhou, Z.-H. (2008). *Isolation Forest.* IEEE ICDM 200
 Tukey's IQR fences (Tukey, 1977, *Exploratory Data Analysis*) and the MAD-based modified z-score (Iglewicz, B., &
 Hoaglin, D. C. (1993). *How to Detect and Handle Outliers.* ASQC).
 
-- **We implement (Implemented):** `method: iqr` (`k` configurable, default 1.5 for flagging and 3.0 for capping in the
-  auto recipe) and `method: mad` (modified z-score > 3.5). `action: clip | flag | both`. Bounds are learned on the
-  training data and reused on new data.
+- **We implement (Implemented):** `method: iqr` (`k` configurable, default 1.5), `method: mad` (modified z-score
+  > 3.5), `method: zscore`, `method: quantile` (winsorising at the 0.5% / 99.5% training quantiles) and explicit
+  `bounds` (valid ranges known from a schema). `action: clip | flag | both | null`. Bounds are learned on the training
+  data and reused on new data. The auto recipe uses quantile winsorising: IQR fences on multi-modal columns (e.g.
+  spend across price plans) clipped legitimate high values in our tests, extreme quantiles do not.
 - **Why both:** univariate rules are explainable per column; Isolation Forest catches multivariate oddities.
 
 ## 5. Distribution transforms

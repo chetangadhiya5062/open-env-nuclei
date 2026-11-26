@@ -433,3 +433,102 @@ To fulfill the core project goal honestly: an agent that actually *learns* tabul
 2. Exported weights to `models/ppo_policy.npz` and `models/ppo_policy.json` so the runtime demo requires no PyTorch or CUDA dependencies.
 3. Left LLM row as 'not measured' in the README table to uphold the strict 'no invented numbers' ground rule while HF credits/endpoint remain unconfigured.
 
+
+---
+
+# v4: FeatureForge product (branch `v4-feature-engineering`)
+
+Goal: turn the project into a product: upload a data file (CSV, Excel, Parquet, JSON) and get back a cleaned,
+feature-engineered dataset, with a dashboard, REST API and CLI, based on published research; and prepare (not run)
+all GPU training, tuning and validation for later.
+
+## What changed
+
+| Area | Files | Summary |
+|---|---|---|
+| Research | `docs/RESEARCH.md`, `docs/references/` | 34 papers + 13 documentation snapshots; per source: what we implement and why, or why not. `INDEX.md` maps each source to the code that uses it. Paywalled papers/books have citation notes instead of PDFs. `scripts/fetch_references.py` re-downloads the open copies. |
+| Library | `featureforge/` | type inference, profiling (quality score, warnings, leak checks, drift), 20 recipe steps (clean / feature / encode / select), `Pipeline` (fit on train, transform new data, input validation, per-step report, save/load), `auto_recipe` (clean / standard / full), `leakage_safe_split`, HTML report, dataset card, synthetic messy samples |
+| Interfaces | `featureforge/dashboard.py`, `api.py`, `cli.py`, `service.py` | Gradio dashboard (5 tabs + one-click auto) mounted at `/ui`, FastAPI REST API (`/v1/...`, optional API key, upload limit), CLI `fe` |
+| Reuse of the environment | `featureforge/envbridge.py`, `scripts/eval_library_on_env.py` | the library's cleaning is graded by the environment's own grader on the agents' test seeds |
+| Deployment | `docker/featureforge.Dockerfile`, `docker-compose.yml`, `.env.example` | product image (non-root, healthcheck, volume) + compose for product and environment |
+| GPU prep | `training/` | committed deterministic datasets with manifest + sha256; configs and scripts for PPO, Optuna (PPO, SFT, FE models), LoRA SFT, GRPO, evaluation, FE validation benchmark; `GPU_RUNBOOK.md`; `smoke_test.ps1/.sh` |
+| Quality | `tests/test_ff_*.py`, `tests/test_training_prep.py`, `.github/workflows/ci.yml` | 86 new tests (183 total); CI adds a CLI smoke run, a CPU smoke run of every training script, and the product Docker build + API check |
+| Docs | `README.md`, `CHANGELOG.md` | README rewritten as a product page; environment documentation kept further down |
+
+## Measured (and how)
+
+- `python scripts/eval_library_on_env.py --seeds 10`: one-shot generic cleaning scores 0.967 / 0.960 / 0.932 on
+  easy / medium / hard (rule-based agent: 0.967 / 0.960 / 0.968). The gap on hard is the category aliases
+  (`NY -> New York`), because the recipe is not given the allowed vocabulary. Saved in
+  `docs/benchmarks/library_on_env.md`.
+- `pytest`: 183 passed. `ruff check .` and `ruff format --check .`: clean.
+- `training/smoke_test.ps1`: every training script ran 1-2 steps on CPU with a tiny offline model and finished.
+  These runs produce no meaningful numbers and none are reported.
+- Not run (on purpose): real PPO/SFT/GRPO training, Optuna searches, LLM evaluation with a trained model, the FE
+  validation benchmark. All are in `training/GPU_RUNBOOK.md`.
+
+## Why (design choices)
+
+- **Recipes, not code.** A recipe is a list of typed, validated steps (pydantic). It can be generated, edited,
+  saved, diffed and replayed, and it is safe: nothing user-provided is executed. CAAFE-style model-written code was
+  rejected for this reason (RESEARCH.md section 1).
+- **fit / transform everywhere.** Every statistic (medians, category maps, bounds, encodings, selected columns) is
+  learned on training rows only. Target encoding uses out-of-fold values for the training rows (a test shows that a
+  pure-noise ID column gets no fake signal, while the naive in-sample encoding shows r > 0.4).
+- **Leak detection is part of profiling.** The demo churn data contains `cancellation_reason`, recorded only after a
+  customer left. The profiler flags it (`possible_target_leak`), auto mode drops it, and the FE benchmark config
+  removes it from every variant (in the smoke run a naive baseline that kept it scored a fake holdout ROC-AUC of 1.0).
+- **Quantile winsorising in auto mode** instead of IQR fences: IQR capping clipped legitimate high spend values of a
+  premium plan in the churn sample (106 of 1,500 rows). Extreme quantiles only touch true outliers.
+- **Product dependencies in the main dependency list** (scikit-learn, scipy, pyarrow, openpyxl, jinja2, matplotlib,
+  typer, python-multipart): one `pip install -e .` gives the full product. Cost: the Hugging Face Space image is
+  larger.
+- **GPU plan:** SFT on expert trajectories first (the prompt is exactly what `LLMAgent` sends, so a fine-tuned model
+  drops into the existing agent), then GRPO where the reward is the environment's own step reward for the generated
+  action. Half of the SFT episodes start after 1-3 random actions so the model also sees recovery states.
+- **Seeds:** the test seeds 0-9 used for every README number never appear in any training, validation or tuning set
+  (`tests/test_training_prep.py` checks the ranges).
+
+## Interview explanation
+
+"The original project was an RL environment for cleaning tables. In v4 I turned the cleaning and feature-engineering
+knowledge into a product: a library with a dashboard, REST API and CLI that takes any CSV, Excel, Parquet or JSON
+file, profiles it, warns about problems such as target leaks, and produces a cleaned, feature-engineered dataset plus
+a saved pipeline that can be re-applied to new data. Every technique is tied to a paper: smoothed out-of-fold target
+encoding from Micci-Barreca and CatBoost, MICE and KNN imputation with missing indicators, Isolation Forest,
+Deep-Feature-Synthesis-style aggregations, an OpenFE-style feature search, and data validation and drift checks in the
+spirit of TFDV. The key engineering idea is fit-on-train, transform-on-new-data for every step, so the pipeline
+cannot leak the target into validation scores; there are tests that prove the target encoder does not leak. I also
+reused the RL environment as an independent benchmark: the library's one-shot cleaning reaches 0.967 / 0.960 / 0.932
+on the three tasks against the hidden ground truth. Finally I prepared a GPU training plan: supervised fine-tuning of
+a small LLM on expert trajectories, then GRPO where the environment itself is the reward, with datasets, configs,
+Optuna searches and a runbook, all smoke-tested on CPU."
+
+## Decisions needed (owner)
+
+1. **Push and PR.** Branch `v4-feature-engineering` is committed locally only. Pushing to GitHub, opening a PR and
+   redeploying the Hugging Face Space all need your go-ahead.
+2. **Reference PDFs in git.** The 27 PDFs and 13 HTML snapshots (about 70 MB) are kept in `docs/references/` but are
+   git-ignored: most are arXiv preprints whose licence does not allow redistribution, and the repository is public.
+   `INDEX.md`, the citation notes for paywalled sources, `fetch_log.json` (URLs + sha256) and the fetch script are
+   committed, so anyone can rebuild the folder. Options: keep as is (safest), commit only the CC-licensed ones
+   (JSS, PLoS ONE), or commit all if the repository becomes private.
+3. **Product name.** "FeatureForge" and the CLI name `fe` are working names; check for existing trademarks and
+   package names before selling it under that name.
+4. **Dependencies on the Space.** The product dependencies are now part of `requirements.txt`, which also builds the
+   environment's Hugging Face Space image (bigger image). Alternative: move them to an optional `[app]` extra.
+5. **Base LLM for fine-tuning.** Default is `Qwen/Qwen2.5-1.5B-Instruct` (open licence, no gated access). The v3
+   zero-shot benchmark used `meta-llama/Llama-3.1-8B-Instruct` (gated: accept the licence and `hf auth login`;
+   QLoRA on a 24 GB GPU). Pick one before the GPU session.
+6. **Docker image not built locally.** The Docker daemon was not running on this machine, so the new image was not
+   built here; the CI job builds it and calls the API. Start Docker Desktop and run `docker compose up --build` to
+   check locally.
+7. **Auto mode drops leak-flagged columns** by default. That is the safe choice; if you prefer warn-only, it is one
+   line in `featureforge/auto.py`.
+8. **Selling / hosting.** A hosted, paid service still needs user accounts and auth beyond the single API key,
+   HTTPS, per-user storage and quotas, a background job queue for very large files, terms of service and a data
+   retention policy (`RunStore.cleanup` deletes runs older than `FF_RUN_TTL_HOURS`, default 72, but nothing schedules
+   it yet). These are product decisions rather than code changes.
+9. **Older tool mentions.** Some pre-v4 files (`docs/BRIEF_2.md`, `docs/RESUME.md`, an earlier section of this file)
+   and earlier commits on `main` still mention the coding assistant used before. v4 did not edit or rewrite them
+   (no deleting your files, no history rewrites). Say if you want those files cleaned up in a follow-up commit.

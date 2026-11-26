@@ -16,3 +16,5 @@ ff_workspace/
 ff_output/
 training/runs/
 *.db
+docs/references/*.pdf
+docs/references/*.html
