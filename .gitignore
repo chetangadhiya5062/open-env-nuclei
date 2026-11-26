@@ -12,3 +12,7 @@ build/
 .coverage
 data-cleaning-env/
 benchmark_results/
+ff_workspace/
+ff_output/
+training/runs/
+*.db
