@@ -213,8 +213,16 @@ class Pipeline:
             "input_columns": len(self.input_columns_),
             "output_columns": len(self.output_columns_),
             "fitted_at": self.fitted_at_,
+            "leaks": self.leaks(),
             "steps": [r.as_dict() for r in self.report_],
         }
+
+    def leaks(self) -> List[Dict[str, Any]]:
+        """Target-leak findings from the leak check (``drop_columns`` with ``leak_policy``) and the action taken."""
+        out: List[Dict[str, Any]] = []
+        for s in self.steps:
+            out.extend(getattr(s, "leaks_", []) or [])
+        return out
 
     def metadata(self) -> Dict[str, Any]:
         import numpy
@@ -237,6 +245,7 @@ class Pipeline:
             "input_types": self.input_types_,
             "required_columns": self.required_columns_,
             "output_columns": self.output_columns_,
+            "leaks": self.leaks(),
             "steps": [r.as_dict() for r in self.report_],
         }
 

@@ -151,12 +151,17 @@ def column_detail(state: Dict[str, Any], column: Optional[str]):
 
 
 # --------------------------------------------------------------------------------------------- 3 pipeline
-def make_recipe(state: Dict[str, Any], target: Optional[str], level: str):
+def make_recipe(state: Dict[str, Any], target: Optional[str], level: str, leak_policy: str = "auto"):
     df = state.get("df")
     if df is None:
         return _err("load data first"), "", []
     try:
-        r = auto_recipe(df, target=_target(target), level=level, report=state.get("profile"), name=f"auto-{level}")
+        report = state.get("profile")
+        if report and (report.get("target") or {}).get("name") != _target(target):
+            report = None  # profiled with another target: leak checks must be redone
+        r = auto_recipe(
+            df, target=_target(target), level=level, report=report, name=f"auto-{level}", leak_policy=leak_policy
+        )
     except KeyError as exc:
         return _err(str(exc)), "", []
     names = [f"{i + 1}. {s.step}" for i, s in enumerate(r.steps)]
@@ -251,6 +256,11 @@ def do_run(
         msg += (
             f"\n\nLeakage-safe split ({sp['strategy']}): {sp['train_rows']} train / {sp['test_rows']} test rows; "
             f"{sp['shared_feature_rows']} feature rows shared between them. Pipeline fitted on train only."
+        )
+    for leak in s.get("leaks") or []:
+        msg += (
+            f"\n\n**Target leak:** `{leak['column']}` ({leak['code']}, {leak['confidence']} confidence, "
+            f"normalised MI {leak['nmi']}) &rarr; {leak['action']}"
         )
     if s.get("drifted_columns"):
         msg += f"\n\nColumns with major train/test drift: {s['drifted_columns']}"
@@ -403,6 +413,12 @@ def build_dashboard():
             with gr.Tab("3 · Pipeline", id=2):
                 with gr.Row():
                     level = gr.Radio(["clean", "standard", "full"], value="standard", label="Auto level")
+                    leak_pol = gr.Radio(
+                        ["auto", "drop", "warn"],
+                        value="auto",
+                        label="Target-leak policy",
+                        info="auto: drop high-confidence leaks, warn on the rest; drop: drop all flagged; warn: keep all",
+                    )
                     gen_btn = gr.Button("Generate recipe from data")
                     recipe_upload = gr.File(
                         label="…or import recipe (.yaml/.json)", file_types=[".yaml", ".yml", ".json"]
@@ -469,11 +485,11 @@ def build_dashboard():
         prof_btn.click(_prof, [state, target], prof_outputs)
         col_pick.change(column_detail, [state, col_pick], [col_plot, col_json])
 
-        def _gen(s, t, lv):
-            m, y, names = make_recipe(s, t, lv)
+        def _gen(s, t, lv, lp):
+            m, y, names = make_recipe(s, t, lv, lp)
             return m, y, gr.update(choices=names, value=names)
 
-        gen_btn.click(_gen, [state, target, level], [recipe_msg, recipe_code, enabled])
+        gen_btn.click(_gen, [state, target, level, leak_pol], [recipe_msg, recipe_code, enabled])
 
         def _imp(p):
             y, names = load_recipe_file(p)
@@ -496,10 +512,10 @@ def build_dashboard():
         exp_btn.click(export_files, state, [downloads, card_md])
         apply_btn.click(apply_new, [state, new_file, fmt], [apply_out, apply_msg, apply_preview])
 
-        def _auto(s, t):
+        def _auto(s, t, lp):
             pr = _prof(s, t)
             s2 = pr[0]
-            m, y, names = make_recipe(s2, t, "standard")
+            m, y, names = make_recipe(s2, t, "standard", lp)
             r = list(do_run(s2, y, names, t, 0, "auto", None, None))
             r[5] = gr.update(choices=r[5], value=None)
             r[6] = ""
@@ -508,7 +524,7 @@ def build_dashboard():
 
         auto_btn.click(
             _auto,
-            [state, target],
+            [state, target, leak_pol],
             prof_outputs[1:] + [recipe_msg, recipe_code, enabled] + run_outputs + [downloads, card_md, tabs],
         )
     return demo

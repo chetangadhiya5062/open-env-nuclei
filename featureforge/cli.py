@@ -39,6 +39,11 @@ def _read(path: Path):
         _fail(str(exc))
 
 
+def _check_policy(policy: str) -> None:
+    if policy not in ("auto", "drop", "warn"):
+        _fail("--leak-policy must be auto, drop or warn")
+
+
 @app.callback()
 def _main(verbose: bool = typer.Option(False, "--verbose", "-v", help="debug logging")) -> None:
     setup_logging("DEBUG" if verbose else None)
@@ -73,15 +78,19 @@ def auto(
     target: Optional[str] = typer.Option(None, "--target", "-t"),
     level: str = typer.Option("standard", "--level", "-l", help="clean | standard | full"),
     out: Path = typer.Option(Path("recipe.yaml"), "--out", "-o"),
+    leak_policy: str = typer.Option(
+        "auto", "--leak-policy", help="auto (drop high-confidence target leaks, warn on the rest) | drop | warn"
+    ),
 ) -> None:
     """Generate a recipe from the data (edit it, then use `fe run --recipe`)."""
     from .auto import auto_recipe
 
     if level not in ("clean", "standard", "full"):
         _fail("level must be clean, standard or full")
+    _check_policy(leak_policy)
     df = _read(data)
     try:
-        r = auto_recipe(df, target=target, level=level, name=data.stem)  # type: ignore[arg-type]
+        r = auto_recipe(df, target=target, level=level, name=data.stem, leak_policy=leak_policy)  # type: ignore[arg-type]
     except KeyError as exc:
         _fail(str(exc))
     r.save(out)
@@ -99,12 +108,16 @@ def run(
     split_strategy: str = typer.Option("auto", "--split-strategy", help="auto | random | stratified | group | time"),
     group_column: Optional[str] = typer.Option(None, "--group-column"),
     time_column: Optional[str] = typer.Option(None, "--time-column"),
+    leak_policy: str = typer.Option(
+        "auto", "--leak-policy", help="auto (drop high-confidence target leaks, warn on the rest) | drop | warn"
+    ),
 ) -> None:
     """Clean + engineer features, and write the dataset, pipeline, report and dataset card."""
     from .pipeline import PipelineError
     from .recipe import Recipe
     from .service import run_job
 
+    _check_policy(leak_policy)
     df = _read(data)
     rec = None
     if recipe is not None:
@@ -127,6 +140,7 @@ def run(
             time_column=time_column,
             source_name=data.name,
             source_path=data,
+            leak_policy=leak_policy,
         )
     except (PipelineError, KeyError, ValueError) as exc:
         _fail(str(exc))
@@ -134,6 +148,11 @@ def run(
     typer.echo(f"{tuple(s['input_shape'])} -> {tuple(s['output_shape'])} in {s['seconds']}s; task {s['task']}")
     if s["test_output_shape"]:
         typer.echo(f"test part: {tuple(s['test_output_shape'])} (split {s['split']['strategy']})")
+    for leak in s.get("leaks") or []:
+        typer.secho(
+            f"target leak: {leak['column']} ({leak['code']}, {leak['confidence']} confidence) -> {leak['action']}",
+            fg=typer.colors.YELLOW,
+        )
     for step in s["pipeline"]["steps"]:
         typer.echo(f"  {step['index']:>2}. {step['step']:<20} {step['cols_before']:>4} -> {step['cols_after']:<4} cols")
     typer.echo(f"artifacts in {out_dir}: {', '.join(sorted(res.files))}")

@@ -4,6 +4,7 @@ report_to: none
 model:
   name: Qwen/Qwen2.5-1.5B-Instruct   # must be the base model of the SFT adapter
   adapter: null                      # path to the SFT LoRA adapter (recommended)
+  load_in_4bit: false                # QLoRA, needed for 7-8B models on a 24 GB GPU
 data:
   dir: null                          # default training/datasets
   limit_train: null

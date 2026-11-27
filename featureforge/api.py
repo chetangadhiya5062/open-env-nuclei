@@ -81,6 +81,11 @@ async def _read_upload(file: UploadFile) -> tuple:
     return df, bytes(buf)
 
 
+def _check_policy(policy: str) -> None:
+    if policy not in ("auto", "drop", "warn"):
+        raise HTTPException(status_code=422, detail="leak_policy must be auto, drop or warn")
+
+
 def _opt(v: Optional[str]) -> Optional[str]:
     return v if v not in (None, "", "null", "none") else None
 
@@ -122,13 +127,17 @@ def create_app() -> FastAPI:
 
     @api.post("/v1/recipes/auto", dependencies=[v1])
     async def recipe_auto(
-        file: UploadFile = File(...), target: Optional[str] = Form(None), level: str = Form("standard")
+        file: UploadFile = File(...),
+        target: Optional[str] = Form(None),
+        level: str = Form("standard"),
+        leak_policy: str = Form("auto", description="auto | drop | warn"),
     ) -> Dict[str, Any]:
         if level not in ("clean", "standard", "full"):
             raise HTTPException(status_code=422, detail="level must be clean, standard or full")
+        _check_policy(leak_policy)
         df, _ = await _read_upload(file)
         try:
-            r = auto_recipe(df, target=_opt(target), level=level)  # type: ignore[arg-type]
+            r = auto_recipe(df, target=_opt(target), level=level, leak_policy=leak_policy)  # type: ignore[arg-type]
         except KeyError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {"recipe": r.to_dict(), "yaml": r.to_yaml()}
@@ -152,7 +161,9 @@ def create_app() -> FastAPI:
         split_strategy: str = Form("auto"),
         group_column: Optional[str] = Form(None),
         time_column: Optional[str] = Form(None),
+        leak_policy: str = Form("auto", description="auto mode only: auto | drop | warn"),
     ) -> Dict[str, Any]:
+        _check_policy(leak_policy)
         df, raw = await _read_upload(file)
         rec = None
         if _opt(recipe):
@@ -181,6 +192,7 @@ def create_app() -> FastAPI:
                 source_name=Path(file.filename or "upload").name,
                 source_path=src,
                 run_id=run_id,
+                leak_policy=leak_policy,
             )
         except (PipelineError, KeyError, ValueError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

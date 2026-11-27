@@ -69,18 +69,23 @@ def load_model(cfg: Dict[str, Any]):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    from training.train_sft import resolve_model
+    from training.train_sft import model_kwargs, resolve_model
 
     name = resolve_model(cfg, Path(cfg["data_dir"]) if cfg.get("data_dir") else DATASETS)
     tok = AutoTokenizer.from_pretrained(cfg.get("adapter") or name)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float32
-    model = AutoModelForCausalLM.from_pretrained(name, dtype=dtype)
+    bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+    quantized = bool(cfg["model"].get("load_in_4bit"))
+    model = AutoModelForCausalLM.from_pretrained(name, **model_kwargs(cfg["model"], bf16))
     if cfg.get("adapter"):
         from peft import PeftModel
 
-        model = PeftModel.from_pretrained(model, cfg["adapter"]).merge_and_unload()
+        model = PeftModel.from_pretrained(model, cfg["adapter"])
+        if not quantized:  # merging into 4-bit weights is lossy; keep the adapter separate then
+            model = model.merge_and_unload()
+    if quantized:  # already placed on the GPU by device_map
+        return model.eval(), tok, name
     device = "cuda" if torch.cuda.is_available() and cfg.get("device", "auto") != "cpu" else "cpu"
     return model.to(device).eval(), tok, name
 
