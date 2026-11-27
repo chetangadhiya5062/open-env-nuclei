@@ -14,8 +14,9 @@ it grew out of, which is used as an independent benchmark for the cleaning part.
   that leak the target are flagged and dropped by auto mode.
 - **Reproducible artifacts.** `recipe.yaml` + `pipeline.joblib` + `metadata.json`, an HTML quality report and a
   dataset card (Datasheets for Datasets) for every run.
-- **Research-based.** Each technique is tied to its paper in [docs/RESEARCH.md](docs/RESEARCH.md), with local copies
-  and notes in [docs/references/](docs/references/INDEX.md).
+- **Research-based.** Each technique is tied to its paper in [docs/RESEARCH.md](docs/RESEARCH.md); every source is
+  listed in [docs/references/INDEX.md](docs/references/INDEX.md). The PDF and web-page copies are local only (not in
+  this repository); `python scripts/fetch_references.py` downloads them into `docs/references/`.
 
 ## What it does
 

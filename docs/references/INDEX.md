@@ -5,10 +5,16 @@ offline. Retrieved 2026-11-27 with `python scripts/fetch_references.py` (URLs, b
 [`fetch_log.json`](fetch_log.json); re-run the script to rebuild the folder).
 
 **Access notes.** "Open PDF" = an openly downloadable copy (arXiv preprint, open proceedings, open-access journal,
-or the authors' own copy). These files are stored for private review only; their copyright stays with the authors
-and publishers, and arXiv's default licence does not grant redistribution rights. That is why the PDF and HTML
-snapshots are kept in this folder but are **git-ignored** (see "Decisions needed" in `docs/PHASE_NOTES.md`).
-Paywalled papers and books have a `.md` note with the full citation, DOI and notes instead of a PDF.
+or the authors' own copy). Their copyright stays with the authors and publishers.
+
+> **Local copies only.** The PDFs and HTML snapshots are kept in this folder on the project machine but are not in
+> the public GitHub repository (git-ignored; most arXiv licences do not allow redistribution). They are planned for a
+> separate private repository. To get them on any machine, run `python scripts/fetch_references.py` from the
+> repository root: it downloads every file listed below into this folder; compare with the sha256 values in
+> `fetch_log.json`.
+
+Paywalled papers and books have a `.md` note with the full citation, DOI and notes instead of a PDF (they cannot be
+legally downloaded); those notes, this index and `fetch_log.json` are in the repository.
 
 ## Papers
 

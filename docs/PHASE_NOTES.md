@@ -508,11 +508,10 @@ Optuna searches and a runbook, all smoke-tested on CPU."
 
 1. **Push and PR.** Branch `v4-feature-engineering` is committed locally only. Pushing to GitHub, opening a PR and
    redeploying the Hugging Face Space all need your go-ahead.
-2. **Reference PDFs in git.** The 27 PDFs and 13 HTML snapshots (about 70 MB) are kept in `docs/references/` but are
-   git-ignored: most are arXiv preprints whose licence does not allow redistribution, and the repository is public.
-   `INDEX.md`, the citation notes for paywalled sources, `fetch_log.json` (URLs + sha256) and the fetch script are
-   committed, so anyone can rebuild the folder. Options: keep as is (safest), commit only the CC-licensed ones
-   (JSS, PLoS ONE), or commit all if the repository becomes private.
+2. **Reference PDFs (decided).** Your choice: the 27 PDFs and 13 HTML snapshots (about 70 MB) stay on disk in
+   `docs/references/` but are git-ignored and were never committed to this branch, so a public push contains none of
+   them. `INDEX.md`, the citation notes, `fetch_log.json` and `scripts/fetch_references.py` are tracked. Still open:
+   create the separate private repository for the papers.
 3. **Product name.** "FeatureForge" and the CLI name `fe` are working names; check for existing trademarks and
    package names before selling it under that name.
 4. **Dependencies on the Space.** The product dependencies are now part of `requirements.txt`, which also builds the
