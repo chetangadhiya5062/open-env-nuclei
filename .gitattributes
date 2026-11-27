@@ -1,2 +1,9 @@
 * text=auto eol=lf
 *.png binary
+*.gz binary
+*.parquet binary
+*.pdf binary
+*.npz binary
+*.zip binary
+training/datasets/** -text
+docs/references/*.html -text

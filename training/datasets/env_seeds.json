@@ -1,0 +1,28 @@
+{
+  "tasks": [
+    "easy-clean",
+    "medium-clean",
+    "hard-clean"
+  ],
+  "test": [
+    0,
+    10
+  ],
+  "val": [
+    60,
+    90
+  ],
+  "train": [
+    100,
+    700
+  ],
+  "grpo_val": [
+    1000,
+    1030
+  ],
+  "grpo_train": [
+    1100,
+    1500
+  ],
+  "note": "[start, end) ranges; test = benchmark seeds"
+}

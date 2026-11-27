@@ -12,3 +12,8 @@ build
 *.egg-info
 benchmark_results
 tests
+docs
+training
+ff_workspace
+ff_output
+models/*.zip

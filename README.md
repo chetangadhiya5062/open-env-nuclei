@@ -1,15 +1,228 @@
-# OpenEnv Data Cleaning Environment
+# FeatureForge
 
-An [OpenEnv](https://github.com/meta-pytorch/OpenEnv) environment where an agent cleans a dirty pandas table one
-action at a time, plus baselines, a benchmark, an LLM agent and a Gradio demo.
+**Upload a messy table, get back a clean, feature-engineered dataset, plus the pipeline that made it.**
 
-- **Reproducible:** every episode is `(task_id, seed)` -> the same dirty table, with a hidden clean ground truth.
-- **Honest scoring:** the training-style *reward* and the final *grader score* are separate things (see below).
-- **Agents included:** do-nothing, random, a rule-based heuristic, a trained RL agent (PPO), and a zero-shot LLM agent (Llama 3.1 8B through the Hugging Face router). The RL agent is trained with PPO on held-out seeds and runs via lightweight pure-NumPy inference with zero PyTorch dependencies at runtime.
+FeatureForge profiles tabular data (CSV, TSV, Excel, Parquet, JSON), finds quality problems and target leaks, cleans
+the data, engineers features, and saves everything as a reproducible recipe that can be re-applied to new data. It
+ships as a Python library, a web dashboard, a REST API and a CLI. The project also contains the
+[OpenEnv data-cleaning environment](#the-openenv-data-cleaning-environment) (with RL, LLM and rule-based agents) that
+it grew out of, which is used as an independent benchmark for the cleaning part.
 
-> The Hugging Face Space demo runs at [chetangadhiya017-data-cleaning-env.hf.space](https://chetangadhiya017-data-cleaning-env.hf.space). To redeploy the latest code, see [Deploy](#deploy-to-hugging-face-spaces).
+- **One click or full control.** Auto mode builds a recipe from the data; every step is a plain, editable YAML entry.
+- **Leakage-safe by construction.** Every statistic is learned with `fit` on training data and replayed with
+  `transform`; target encoding is out-of-fold; the train/test split keeps duplicates and groups on one side; columns
+  that leak the target are flagged and dropped by auto mode.
+- **Reproducible artifacts.** `recipe.yaml` + `pipeline.joblib` + `metadata.json`, an HTML quality report and a
+  dataset card (Datasheets for Datasets) for every run.
+- **Research-based.** Each technique is tied to its paper in [docs/RESEARCH.md](docs/RESEARCH.md); every source is
+  listed in [docs/references/INDEX.md](docs/references/INDEX.md). The PDF and web-page copies are local only (not in
+  this repository); `python scripts/fetch_references.py` downloads them into `docs/references/`.
 
-## How it works
+## What it does
+
+| Area | Capabilities |
+|---|---|
+| **Read** | CSV / TSV (delimiter + encoding detection), Excel `.xlsx`, Parquet, JSON, JSON Lines, Feather; size limit, clear errors |
+| **Understand** | semantic type inference (numeric, categorical, datetime, text, ID, boolean, constant), even when numbers/dates are stored as text |
+| **Profile** | missingness, duplicates, cardinality, skew, IQR outliers, correlations, placeholders (`N/A`, `-`, `?`), case/spacing variants, class imbalance, target association (normalised MI), **leak detection** (column equal to / determining the target, ID columns), drift between two tables (PSI + KS test), 0-100 quality score; sampling for large files |
+| **Clean** | drop unusable columns, string normalisation + variant merging, type fixing (`"$1,250.00"`, `"45%"`, mixed date formats, yes/no), deduplication, imputation (median / mean / KNN / iterative-MICE / constant) with missing-indicator flags, outliers (IQR, MAD, z-score, quantile winsorising, explicit bounds, Isolation Forest) |
+| **Engineer** | datetime parts + cyclical sin/cos + elapsed time, log1p / Yeo-Johnson / quantile bins, scaling, pairwise interactions, group aggregations (DFS-style), text statistics + TF-IDF (+SVD), one-hot (top-k + other), frequency, ordinal, smoothed out-of-fold / ordered target encoding |
+| **Select** | variance filter, correlation pruning (keeps the more informative column), mutual-information selection, OpenFE-style candidate generation (MI screen + residual boosting) |
+| **Ship** | engineered dataset (CSV + Parquet), test split output, fitted pipeline, recipe, HTML report, dataset card, run summary, one zip bundle |
+
+20 pipeline steps in total: `fe steps` lists them with their parameters.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph IN[Interfaces]
+      UI[Gradio dashboard /ui]
+      API[FastAPI REST /v1]
+      CLI[CLI: fe]
+      LIB[Python API]
+    end
+    UI & API & CLI --> SVC[service.run_job]
+    LIB --> PIPE
+    SVC --> IO[io: read_table] --> PROF[profile: types, quality, leaks, drift]
+    PROF --> AUTO[auto_recipe] --> REC[(recipe.yaml)]
+    REC --> PIPE[Pipeline: fit on train / transform new data]
+    SVC --> SPLIT[leakage_safe_split] --> PIPE
+    PIPE --> STEPS[20 steps: clean, feature, encode, select]
+    PIPE --> ART[(pipeline.joblib + metadata.json)]
+    SVC --> OUT[(data.csv / data.parquet, report.html, datacard.md, bundle.zip)]
+    PIPE -. same grader .-> ENV[OpenEnv environment benchmark]
+```
+
+`featureforge/` is a pure library (no UI imports); the dashboard, API and CLI are thin layers over
+`featureforge.service.run_job`.
+
+## Quick start (Windows PowerShell)
+
+Python 3.10+ is required.
+
+```powershell
+git clone https://github.com/chetangadhiya5062/open-env-nuclei.git
+cd open-env-nuclei
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+```
+
+**Dashboard + API** (open <http://localhost:8000/ui>, API docs at <http://localhost:8000/docs>):
+
+```powershell
+fe serve --port 8000
+```
+
+Tabs: **1 Data** (upload or load a sample, choose the target, or press *One-click auto*) → **2 Profile** (quality score,
+findings, charts, per-column detail, HTML report) → **3 Pipeline** (generate a clean / standard / full recipe, untick
+or edit steps, optional leakage-safe split, run, step report, before/after per column) → **4 Export** (dataset,
+pipeline, recipe, report, dataset card, zip) → **5 Apply** (run the fitted pipeline on new data, with drift check).
+
+**CLI:**
+
+```powershell
+fe sample churn --rows 5000 --out churn.csv                       # a messy demo table
+fe profile churn.csv --target churned --out report.html            # quality report
+fe auto churn.csv --target churned --level standard --out recipe.yaml
+fe run churn.csv --recipe recipe.yaml --out-dir out                # or without --recipe: auto mode
+fe run churn.csv --target churned --test-size 0.2 --out-dir out    # leakage-safe split, fit on train only
+fe transform new_customers.csv --pipeline out/pipeline --out new_features.parquet
+fe drift churn.csv new_customers.csv
+```
+
+**Python:**
+
+```python
+from featureforge import Pipeline, auto_recipe, profile, read_table
+
+df = read_table("churn.csv")
+report = profile(df, target="churned")  # dict: dataset, columns, warnings, quality_score, ...
+pipe = Pipeline(auto_recipe(df, target="churned", level="standard"))
+features = pipe.fit_transform(df)
+pipe.save("artifacts/churn")  # recipe.yaml + pipeline.joblib + metadata.json
+new = Pipeline.load("artifacts/churn").transform(read_table("new_customers.csv"))
+```
+
+**REST API:**
+
+```powershell
+curl.exe -F "file=@churn.csv" -F "target=churned" -F "test_size=0.2" http://localhost:8000/v1/runs
+curl.exe -o data.parquet http://localhost:8000/v1/runs/<run_id>/files/data.parquet
+curl.exe -F "file=@new_customers.csv" -o out.csv http://localhost:8000/v1/runs/<run_id>/transform
+```
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health`, `GET /v1/info`, `GET /v1/steps` | liveness, limits/formats, step catalog with JSON schemas |
+| `POST /v1/profile` | profile an upload |
+| `POST /v1/recipes/auto`, `POST /v1/recipes/validate` | generate / validate a recipe |
+| `POST /v1/runs` | full run (auto or given recipe, optional split); returns the summary |
+| `GET /v1/runs`, `GET /v1/runs/{id}`, `GET /v1/runs/{id}/files/{name}` | list runs, summary, download artifacts |
+| `POST /v1/runs/{id}/transform` | apply that run's fitted pipeline to new data |
+
+**Docker:**
+
+```powershell
+docker compose up --build          # FeatureForge on :8000 (/ui, /docs) and the OpenEnv environment on :7860
+```
+
+### Recipes
+
+```yaml
+version: 1
+name: churn-prep
+target: churned
+task: auto                 # auto | classification | regression | none
+id_columns: [customer_id]  # kept, never used as features
+type_overrides: {zip_code: categorical}
+steps:
+  - step: drop_columns
+    params: {columns: [cancellation_reason]}
+  - step: normalize_strings
+  - step: fix_types
+  - step: deduplicate        # train-only: never removes rows from new data
+  - step: impute
+    params: {numeric_strategy: knn, add_indicator: true}
+  - step: datetime_features
+  - step: target_encode
+    params: {columns: [city], smoothing: 10, scheme: oof}
+  - step: one_hot
+    params: {max_categories: 15}
+```
+
+### Settings
+
+Environment variables (see `.env.example`): `FF_WORK_DIR`, `FF_MAX_UPLOAD_MB` (200), `FF_PROFILE_SAMPLE_ROWS` (50,000),
+`FF_MAX_FIT_ROWS` (20,000, cap for KNN/iterative imputation, Isolation Forest, MI and generation), `FF_PREVIEW_ROWS`,
+`FF_LOG_LEVEL`, `FF_RUN_TTL_HOURS`, `FF_API_KEY` (if set, `/v1` requires the `X-API-Key` header).
+
+## Measured results
+
+Only numbers that were actually run are listed here.
+
+**FeatureForge cleaning on the environment's hidden ground truth.** A one-shot generic recipe (normalise strings, fix
+types, deduplicate, clip to the declared valid ranges, impute), graded by the environment's own grader on the same
+held-out test seeds 0-9 as the agents below (`python scripts/eval_library_on_env.py --seeds 10`):
+
+| | easy-clean | medium-clean | hard-clean |
+|---|---|---|---|
+| do-nothing | 0.854 | 0.795 | 0.608 |
+| FeatureForge (one shot, no agent loop) | 0.967 ± 0.005 (+0.774) | 0.960 ± 0.003 (+0.806) | 0.932 ± 0.004 (+0.826) |
+| rule-based agent (knows the category vocabulary) | 0.967 ± 0.006 (+0.774) | 0.960 ± 0.004 (+0.806) | 0.968 ± 0.003 (+0.918) |
+
+The library matches the hand-written agent on easy and medium. On hard it trails because it is not given the allowed
+category vocabulary, so aliases such as `NY -> New York` stay unfixed (only case/spacing variants are merged).
+
+**Feature-engineering benefit on downstream models:** not measured yet. The validation benchmark
+(`training/fe_benchmark.py`: 5-fold CV with the pipeline fitted inside every fold, plus an untouched holdout) is
+prepared for the GPU machine; see [training/GPU_RUNBOOK.md](training/GPU_RUNBOOK.md).
+
+**Quality:** 183 pytest tests (library, steps, leakage checks, API, CLI, dashboard handlers, training prep, environment),
+ruff lint + format clean, CI on Python 3.10-3.12 with Docker builds and a CPU smoke run of every training script.
+
+## Research basis
+
+Short version (details, and what was deliberately left out, in [docs/RESEARCH.md](docs/RESEARCH.md)):
+
+| Technique | Source |
+|---|---|
+| group aggregations / transform primitives | Deep Feature Synthesis (Kanter & Veeramachaneni, 2015) |
+| candidate generation + residual boosting screen | OpenFE (Zhang et al., ICML 2023) |
+| unary transforms, selection | AutoFeat (Horn et al., 2019) |
+| "keep a feature only if validation improves" | CAAFE (Hollmann et al., NeurIPS 2023) |
+| smoothed target encoding; out-of-fold / ordered statistics | Micci-Barreca (2001); CatBoost (Prokhorenkova et al., 2018) |
+| iterative (MICE) / KNN imputation, missing indicators | van Buuren (2011); Troyanskaya et al. (2001); Le Morvan et al. (2021) |
+| Isolation Forest, IQR, MAD outliers | Liu et al. (2008); Tukey (1977); Iglewicz & Hoaglin (1993) |
+| schema validation, drift (PSI, KS) | Breck et al., MLSys 2019 (TFDV); Siddiqi (2006) |
+| leakage checks and leakage-safe splits | Kaufman et al. (2012); Kapoor & Narayanan (2023) |
+| dataset cards | Datasheets for Datasets (Gebru et al., 2021) |
+| typed operations for LLM cleaning agents | AutoDCWorkflow (2024), CleanAgent (2024), Bendinelli et al. (2025) |
+
+## GPU training (prepared, not yet run)
+
+[`training/`](training/) holds everything needed to train on a GPU machine. **No training, tuning or validation has
+been run;** every script was only smoke-tested for 1-2 steps on CPU (`training/smoke_test.ps1`).
+
+- **Datasets (committed, deterministic, checksummed in `training/datasets/manifest.json`):** 14,398 SFT examples
+  (train) + 722 (validation) built from expert trajectories, including recovery from random actions; 4,000 + 300 GRPO
+  prompt states that the reward function can replay exactly; six messy tabular tables for the FE benchmark.
+- **Scripts + YAML configs:** PPO (`train_ppo`) and its Optuna search (`tune_ppo`), LoRA SFT of a small instruct LLM
+  with TRL (`train_sft`, `tune_sft`), GRPO with the environment as the reward (`train_grpo`), evaluation on the
+  held-out test seeds (`evaluate_llm`, `evaluate_ppo`), and the feature-engineering validation benchmark
+  (`fe_benchmark`).
+- **Step-by-step commands:** [training/GPU_RUNBOOK.md](training/GPU_RUNBOOK.md). Pinned versions:
+  [training/requirements-gpu.txt](training/requirements-gpu.txt).
+
+## The OpenEnv data-cleaning environment
+
+An [OpenEnv](https://github.com/meta-pytorch/OpenEnv) environment where an agent cleans a dirty pandas table one action
+at a time. Every episode is `(task_id, seed)` → the same dirty table, with a hidden clean ground truth; the
+training-style reward and the final grader score are separate.
+
+> The Hugging Face Space demo runs at [chetangadhiya017-data-cleaning-env.hf.space](https://chetangadhiya017-data-cleaning-env.hf.space)
+> (it hosts the environment and its demo, not the FeatureForge product).
 
 ```mermaid
 flowchart LR
@@ -24,182 +237,68 @@ flowchart LR
     GR -. final_score only when done .-> A
 ```
 
-Episode: `reset(task_id, seed)` -> repeat `step(action)` -> `finish` (or the step budget runs out).
-
-### Tasks
-
 | Task | Rows | Step budget | What is wrong with the data |
 |---|---|---|---|
 | `easy-clean` | 40 | 15 | missing values in `age`, `monthly_spend`, and `plan` |
 | `medium-clean` | 60 (+duplicates) | 25 | missing values in four columns and 15% exact duplicate rows |
-| `hard-clean` | 100 (+duplicates) | 45 | all of the above plus inconsistent categories (`NY`, `new york`, `New York `), numbers stored as text (`"25"`), `N/A` placeholders, impossible values (age 999), mixed date formats, stray whitespace |
+| `hard-clean` | 100 (+duplicates) | 45 | all of the above plus inconsistent categories (`NY`, `new york`, `New York `), numbers stored as text, `N/A` placeholders, impossible values (age 999), mixed date formats, stray whitespace |
 
-The table is a synthetic customers table: `customer_id, name, age, city, signup_date, plan, monthly_spend`.
+**Actions:** `fill_missing`, `drop_duplicates`, `standardize_categories`, `cast_type`, `strip_whitespace`, `fix_dates`,
+`clip_outliers`, `drop_rows_with_missing`, `finish`. Invalid actions are not applied; the agent gets the reason in
+`last_error` and a small penalty.
 
-### Actions
+**Reward:** `10 * (Q_now - Q_before) - 0.02 per step - 0.05 no-op - 0.10 invalid - 0.30 per ground-truth row
+destroyed`, plus on `finish` `+1.0` if `Q = 1` else `-2.0 * (1 - Q)`. `Q` is an observable quality score; the shaping
+telescopes, so repeating actions cannot farm reward (there is a test for this).
 
-| `action_type` | Fields | Effect |
-|---|---|---|
-| `fill_missing` | `column_name`, `strategy` (`mean`/`median`/`mode`/`constant`), `value` (constant only) | fill nulls |
-| `drop_duplicates` | - | remove exact duplicate rows |
-| `standardize_categories` | `column_name`, optional `mapping` | fix case/spacing; map aliases like `NY -> New York` |
-| `cast_type` | `column_name`, `target_type` (`int`/`float`/`str`) | convert text to numbers (placeholders become nulls) |
-| `strip_whitespace` | optional `column_name` | trim and collapse spaces |
-| `fix_dates` | `column_name` | normalise mixed formats to `YYYY-MM-DD` |
-| `clip_outliers` | `column_name` | clip to the column's valid range |
-| `drop_rows_with_missing` | optional `column_name` | drop rows with nulls (penalised: loses data) |
-| `finish` | - | end the episode |
+**Grader:** `0.6 * cell_accuracy + 0.2 * row_fidelity + 0.2 * schema_score` against the hidden ground truth, revealed
+only at the end. `improvement = (score - do_nothing) / (1 - do_nothing)`.
 
-Invalid actions (unknown column, `mean` on text, a string constant in a numeric column, ...) are **not applied**; the
-agent receives an explanation in `last_error` and a small penalty.
-
-### Observation
-
-`task_id, seed, row_count, duplicate_count, total_missing, step_count, steps_remaining, quality_score, total_reward,
-invalid_action_count, last_action, last_action_ok, last_message, last_error, data_sample` (first 5 rows) and one
-**column profile** per column: `dtype, expected_type, missing, unique, sample_values, issues` (e.g.
-`{"missing": 5, "whitespace": 3}`), `allowed_values`, `bad_values`, `valid_range`. The expected types, allowed
-category values and valid ranges are part of the task description, like constraints in a database schema.
-`final_score` and `score_breakdown` are `null` until the episode is over.
-
-### Reward
-
-`Q` is an observable quality score: `Q = 1 - (schema violations + duplicate_rows * n_columns) / (initial_rows * n_columns)`.
-
-```
-reward = 10 * (Q_now - Q_before)          progress (potential-based shaping)
-       - 0.02                             every step
-       - 0.05  if the action changed nothing
-       - 0.10  if the action was invalid
-       - 0.30  per ground-truth row destroyed
-       + on `finish` only: +1.0 if Q = 1, otherwise -2.0 * (1 - Q)
-```
-
-The progress terms add up to `10 * (Q_end - Q_start)`, so repeating actions or going in circles cannot earn reward
-(there is a test for this). `observation.reward` is the reward of the last step only; `total_reward` is the sum.
-
-### Grader (separate from the reward)
-
-`score = 0.6 * cell_accuracy + 0.2 * row_fidelity + 0.2 * schema_score`, in [0, 1], computed against the hidden
-ground truth and revealed only in the final observation. Numeric cells earn partial credit by closeness (an imputed
-value is never exactly right); a table identical to the ground truth scores exactly 1.0. Because imputation is
-approximate, the best realistic score is below 1.0 even when `Q` reaches 1.0.
-
-## Benchmark
-
-Mean grader score ± std and normalized improvement over 10 held-out test seeds (seeds 0–9) per task, in-process, from `python benchmark.py` (raw per-episode data in [docs/benchmarks/](docs/benchmarks/)):
+### Agent benchmark (test seeds 0-9, `python benchmark.py`)
 
 | Agent | easy-clean (score / impr) | medium-clean (score / impr) | hard-clean (score / impr) | Invalid-action rate |
 |---|---|---|---|---|
-| do-nothing (finish immediately) | 0.854 ± 0.000 (+0.000) | 0.795 ± 0.000 (+0.000) | 0.608 ± 0.000 (+0.000) | 0.0% |
+| do-nothing | 0.854 ± 0.000 (+0.000) | 0.795 ± 0.000 (+0.000) | 0.608 ± 0.000 (+0.000) | 0.0% |
 | random | 0.627 ± 0.140 (-1.558) | 0.605 ± 0.120 (-0.930) | 0.534 ± 0.058 (-0.189) | 27–31% |
-| rule-based (heuristic checklist) | **0.967 ± 0.006 (+0.774)** | **0.960 ± 0.004 (+0.806)** | **0.968 ± 0.003 (+0.918)** | 0.0% |
-| rl-ppo (400k steps, greedy policy) | 0.964 ± 0.006 (+0.755) | **0.960 ± 0.004 (+0.806)** | 0.967 ± 0.004 (+0.917) | 0.0% |
-| LLM (Llama 3.1 8B, zero-shot) | 0.956 ± 0.012 (+0.698) | 0.959 ± 0.005 (+0.799) | 0.838 ± 0.037 (+0.586) | 0.0–4.0% |
+| rule-based | **0.967 ± 0.006 (+0.774)** | **0.960 ± 0.004 (+0.806)** | **0.968 ± 0.003 (+0.918)** | 0.0% |
+| rl-ppo (400k steps, CPU) | 0.964 ± 0.006 (+0.755) | **0.960 ± 0.004 (+0.806)** | 0.967 ± 0.004 (+0.917) | 0.0% |
+| LLM (Llama 3.1 8B, zero-shot, 5 seeds) | 0.956 ± 0.012 (+0.698) | 0.959 ± 0.005 (+0.799) | 0.838 ± 0.037 (+0.586) | 0.0–4.0% |
 
-> **Normalized Improvement Metric:** `improvement = (score - do_nothing_score) / (1 - do_nothing_score)` for the same task and seed. 1.0 = perfect restoration, 0.0 = no gain over leaving the dirty data untouched, negative = degraded data quality.
-
-> **LLM Benchmark Notes:** Evaluated with zero-shot `Llama 3.1 8B` over 5 seeds per task (raw episodes and traces in [docs/benchmarks/llm_run/](docs/benchmarks/llm_run/)). The LLM substantially improves upon random and do-nothing baselines (+0.70 to +0.80 improvement on easy and medium). On `hard-clean`, it achieves 0.838 score (+0.586 improvement), trailing the rule-based agent and trained PPO policy. Analysis of `trace.jsonl` shows why: the LLM frequently attempts date transformations using dictionary mappings inside `standardize_categories` instead of calling `fix_dates`, occasionally confuses allowed category values across different columns, and runs through its entire step budget without issuing an early `finish`.
-
-![benchmark chart](docs/benchmarks/scores.png)
-
-### RL Training & Learning Curve
-
-The RL agent was trained for 400,000 steps using Stable-Baselines3 PPO across 8 parallel environment workers (`SubprocVecEnv`), evaluated every 20,480 steps on held-out validation seeds 50–59, and benchmarked on held-out test seeds 0–9 (which were never exposed during training). Weights are saved as `models/ppo_policy.npz` (and metadata in `models/ppo_policy.json`).
-
-![learning curve](docs/benchmarks/learning_curve.png)
-
-**Key learning insights:**
-- **Zero invalid actions:** The policy learned to never issue invalid actions across any task or test seed (0.0% invalid-action rate).
-- **Matched heuristic performance:** On `hard-clean`, PPO learned to reach **0.967 ± 0.004 (+0.917 improvement)**, virtually identical to the hand-crafted rule-based agent (**0.968 ± 0.003 (+0.918 improvement)**).
-- **Proper operation sequencing:** PPO learned to strip whitespace and standardise categories before handling missing values, avoided destructive row drops, and called `finish` once high quality was attained.
-- **Lightweight deployment:** The policy is exported to NumPy arrays and runs with zero PyTorch dependencies on CPU in the Space demo.
-
-## Quick start (Windows PowerShell)
-
-Python 3.10+ is required.
+The zero-shot LLM trails on `hard-clean` mostly by using the wrong operation for dates and not stopping early (see
+`docs/benchmarks/llm_run/trace.jsonl`); that is the motivation for the SFT + GRPO plan in `training/`. PPO details and
+the learning curve: [docs/benchmarks/](docs/benchmarks/) and `models/ppo_policy.json`.
 
 ```powershell
-git clone https://github.com/chetangadhiya5062/open-env-nuclei.git
-cd open-env-nuclei
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
-
-python -m data_cleaning_env.server.app      # server + demo on http://localhost:7860  (port from $env:PORT)
-```
-
-- Demo UI: <http://localhost:7860/demo> - pick task, seed and agent and watch the steps and before/after tables.
-- API docs: <http://localhost:7860/docs>.
-
-```powershell
-pytest                                       # 97 tests
-ruff check . ; ruff format --check .         # lint
-
+python -m data_cleaning_env.server.app      # environment server + demo on http://localhost:7860/demo
 python benchmark.py                          # do-nothing, random, rule-based, rl over 10 seeds
 $env:HF_TOKEN = "hf_..."                     # your token; never commit it (see .env.example)
-python inference.py --task hard-clean        # LLM agent against the running server, [START]/[STEP]/[END] output
-```
-
-Use the client from Python:
-
-```python
-from data_cleaning_env import DataCleaningAction, DataCleaningEnv
-
-with DataCleaningEnv(base_url="http://localhost:7860").sync() as env:
-    result = env.reset(task_id="medium-clean", seed=3)
-    result = env.step(DataCleaningAction(action_type="drop_duplicates"))
-    print(result.reward, result.observation.quality_score)
-```
-
-> `/reset` and `/step` over plain HTTP are **stateless** (each call builds a fresh environment). Real multi-step
-> episodes use the WebSocket client above (`/ws`).
-
-### Docker
-
-```powershell
-docker build -t openenv-data-cleaning .
-docker run -p 7860:7860 openenv-data-cleaning
-```
-
-### Deploy to Hugging Face Spaces
-
-The deployment script [`scripts/deploy_space.py`](scripts/deploy_space.py) packages the environment, agents, and exported model weights without dev dependencies:
-
-```powershell
-python scripts/deploy_space.py --dry-run     # verify package contents
-# To deploy to https://huggingface.co/spaces/chetangadhiya017/data-cleaning-env:
-# Run 'hf auth login' (paste write token), then:
-python scripts/deploy_space.py
+python inference.py --task hard-clean        # LLM agent against the running server
 ```
 
 ## Project layout
 
 ```
-data_cleaning_env/   schema, models, client, actions, ui and server/ (datagen, quality, operations, grader, environment)
-agents/              base interface, random, do-nothing, rule-based, RL agent (numpy), LLM agent, episode runner
-models/              trained PPO policy weights (ppo_policy.npz) and training metadata
-benchmark.py         agents x tasks x seeds -> markdown / CSV / chart
-train_rl.py          PPO training pipeline (8 parallel workers, validation evaluation, policy export)
-inference.py         LLM agent against a running server (hackathon-style logs)
-tests/               pytest suite (97 tests)
-docs/PHASE_NOTES.md  design notes and interview explanations
+featureforge/        the product library: io, types, profile, steps/, pipeline, recipe, auto, split, report,
+                     datacard, service, cli, api, dashboard, samples, envbridge
+training/            GPU training prep: configs/, datasets/ (+ manifest), train/tune/evaluate scripts, GPU_RUNBOOK.md
+data_cleaning_env/   OpenEnv environment: schema, models, client, actions, ui, server/ (datagen, quality, ops, grader)
+agents/              do-nothing, random, rule-based, RL (numpy), LLM agents and the episode runner
+models/              trained PPO policy (v3)
+docker/, docker-compose.yml   product image + compose for product and environment
+scripts/             Space deploy, reference fetcher, library-on-environment evaluation
+docs/                RESEARCH.md, references/, PHASE_NOTES.md, benchmarks/
+tests/               pytest suite (183 tests)
 ```
-
-## Roadmap
-
-- [x] Train an RL policy (PPO with Stable-Baselines3, exported to NumPy for lightweight inference) and benchmark it against baselines.
-- [x] LLM benchmark numbers in the table above (Llama 3.1 8B evaluated across 5 seeds).
-- [ ] A harder variant where the allowed vocabulary is not given to the agent.
-- [ ] More schemas / real CSV datasets.
 
 ## Limitations
 
-- The data is synthetic; results do not transfer to real data automatically.
-- `Q` is a proxy for quality: an agent can raise `Q` with a bad imputation (e.g. a constant). The grader exists to
-  catch such gaps.
-- Only one grader weighting and one noise model are implemented.
-- Action-space engineering: the RL agent's `standardize_aliases:city` action is a macro that generates alias mappings using the rule-based heuristic, so the policy learns *when* to execute the transformation rather than discovering arbitrary character mappings from scratch.
+- Type inference is heuristic: codes stored as numbers (zip codes, product IDs) need a `type_overrides` entry.
+- Imputation is single imputation; indicator columns mark imputed cells.
+- Auto mode drops columns flagged as possible target leaks; check the warning, then keep a column by removing it
+  from `drop_columns` if it is truly available at prediction time.
+- Pipelines are stored with joblib (pickle): only load artifacts you created. The API never loads uploaded pipelines.
+- One server process stores runs on local disk (`FF_WORK_DIR`); multi-node deployments need shared storage.
+- The environment's data is synthetic; its results do not transfer to real data automatically.
 
 ## Contributors
 

@@ -1,0 +1,282 @@
+{
+  "2004_kraskov_estimating-mutual-information.pdf": {
+    "bytes": 614819,
+    "retrieved": "2026-11-27",
+    "sha256": "bfebb709bc76f62527f618d026f4b775801c25482b96daf78859806cd92346c4",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/cond-mat/0305641"
+  },
+  "2008_liu_isolation-forest.pdf": {
+    "bytes": 258040,
+    "retrieved": "2026-11-27",
+    "sha256": "188a224c40786174ae6c9037d4a64e2ead1bf5bd1eb6da6334b42d3271021862",
+    "status": "ok",
+    "url": "https://cs.nju.edu.cn/zhouzh/zhouzh.files/publication/icdm08b.pdf"
+  },
+  "2011_bergstra_hyperparameter-optimization-tpe.pdf": {
+    "bytes": 498521,
+    "retrieved": "2026-11-27",
+    "sha256": "a5355a3d610dc82f1cc024bb09d063790974a23a7710c0b80b1e38b8ed58a965",
+    "status": "ok",
+    "url": "https://papers.nips.cc/paper_files/paper/2011/file/86e8f7ab32cfd12577bc2619bc635690-Paper.pdf"
+  },
+  "2011_ross_dagger.pdf": {
+    "bytes": 551229,
+    "retrieved": "2026-11-27",
+    "sha256": "12b032cfd451b8ace4b18145dbe24382d2cbe2eda6b562331bc86799bbaafd5e",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1011.0686"
+  },
+  "2011_vanbuuren_mice.pdf": {
+    "bytes": 1374507,
+    "retrieved": "2026-11-27",
+    "sha256": "8d58efc30674ce6eff41574a5f67d36d14a19e9e08edcaa964d57ef1a05e70ad",
+    "status": "ok",
+    "url": "https://www.jstatsoft.org/index.php/jss/article/download/v045i03/550"
+  },
+  "2014_ross_mi-discrete-continuous.pdf": {
+    "bytes": 796839,
+    "retrieved": "2026-11-27",
+    "sha256": "dadf6c48d06631977779bc0b3a67ac2caeb2919451f9666fdec39806a71b15bc",
+    "status": "ok",
+    "url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0087357&type=printable"
+  },
+  "2015_kanter_deep-feature-synthesis.pdf": {
+    "bytes": 4515927,
+    "retrieved": "2026-11-27",
+    "sha256": "826b818e0085e6923060a75e960aa3259d641b4b9c338e1096d3374620f78de2",
+    "status": "ok",
+    "url": "https://groups.csail.mit.edu/EVO-DesignOpt/groupWebSite/uploads/Site/DSAA_DSM_2015.pdf"
+  },
+  "2016_krishnan_activeclean.pdf": {
+    "bytes": 1593362,
+    "retrieved": "2026-11-27",
+    "sha256": "9d99aafcf9e118577741ee23ff24d2a64bd1e46f933b6c648de7b5b1181e101c",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1601.03797"
+  },
+  "2017_rekatsinas_holoclean.pdf": {
+    "bytes": 736040,
+    "retrieved": "2026-11-27",
+    "sha256": "2db031b8ff3fbcc39c436619367680541d6f82bb019bc6da57719b0b72d6d519",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1702.00820"
+  },
+  "2017_schulman_ppo.pdf": {
+    "bytes": 2923532,
+    "retrieved": "2026-11-27",
+    "sha256": "e78feadadbdbb0b601b3c2bcc81404722cd431a489b307545f9b7bea1e8c4f5b",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1707.06347"
+  },
+  "2018_prokhorenkova_catboost.pdf": {
+    "bytes": 723079,
+    "retrieved": "2026-11-27",
+    "sha256": "e682f177e24106a1c48a0dbba1d752a806526bd7ea85bd97e12bec07a2ed955b",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1706.09516"
+  },
+  "2019_akiba_optuna.pdf": {
+    "bytes": 1096378,
+    "retrieved": "2026-11-27",
+    "sha256": "a1ec86ba21a3f2e7bb774c00f8b108dc955993f39feed72f5d8ee3910b6d8a51",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1907.10902"
+  },
+  "2019_breck_data-validation-for-ml.pdf": {
+    "bytes": 435587,
+    "retrieved": "2026-11-27",
+    "sha256": "4c26718460681e3cd8a2be65308f85352af1be46aef84cf749903f9387381f53",
+    "status": "ok",
+    "url": "https://mlsys.org/Conferences/2019/doc/2019/167.pdf"
+  },
+  "2019_horn_autofeat.pdf": {
+    "bytes": 186785,
+    "retrieved": "2026-11-27",
+    "sha256": "43838ea07fd805ac95e8c3f8ded18ab5aff2e1210c377894b55961a0ad1ed601",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1901.07329"
+  },
+  "2021_gebru_datasheets-for-datasets.pdf": {
+    "bytes": 554802,
+    "retrieved": "2026-11-27",
+    "sha256": "c7f595988ee2c109631d5173fdae37ff1774c68ec17add51bd012f2a6e8792d0",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1803.09010"
+  },
+  "2021_hu_lora.pdf": {
+    "bytes": 1609513,
+    "retrieved": "2026-11-27",
+    "sha256": "e9a0d3128767db616085dc0f4e6e455e672e89af823e8ed1282793682787395a",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2106.09685"
+  },
+  "2021_lemorvan_good-imputation-to-predict.pdf": {
+    "bytes": 1602767,
+    "retrieved": "2026-11-27",
+    "sha256": "315bdba3f957e96f53d2b777031bc7334eb7822e187a83d289a969f9f5a59795",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2106.00311"
+  },
+  "2022_cerda_encoding-high-cardinality-strings.pdf": {
+    "bytes": 4724844,
+    "retrieved": "2026-11-27",
+    "sha256": "a4ec2edc994301d75613b74758848fefc6646fd624a87764003ad3ccd5243aec",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/1907.01860"
+  },
+  "2022_grinsztajn_tree-models-tabular.pdf": {
+    "bytes": 26436552,
+    "retrieved": "2026-11-27",
+    "sha256": "3baeb241e4f50981deb6e8e81f29192b1a84f1abde990d5fe8df4e594d993d6f",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2207.08815"
+  },
+  "2023_hollmann_caafe.pdf": {
+    "bytes": 542620,
+    "retrieved": "2026-11-27",
+    "sha256": "0a2a846030b9edf23efcf4b3069d47c6b983c630e0e204b22bed3dff2cae5c8f",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2305.03403"
+  },
+  "2023_kapoor_leakage-reproducibility-crisis.pdf": {
+    "bytes": 652122,
+    "retrieved": "2026-11-27",
+    "sha256": "c433bceda841ca09fe2fd7ddf857fc0818fdf98553e62e54a37cc394c6f70c42",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2207.07048"
+  },
+  "2023_zhang_openfe.pdf": {
+    "bytes": 672472,
+    "retrieved": "2026-11-27",
+    "sha256": "66f4c6548dec1d980704b0dff6ec7b6103bd64bfa810207f9454611f21fb3eba",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2211.12507"
+  },
+  "2024_li_autodcworkflow.pdf": {
+    "bytes": 1499901,
+    "retrieved": "2026-11-27",
+    "sha256": "3c834de2e6a1223e85e4ea7c0ac3458376713a4ccecff924e6e76fac4873e3bf",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2412.06724"
+  },
+  "2024_qi_cleanagent.pdf": {
+    "bytes": 2356463,
+    "retrieved": "2026-11-27",
+    "sha256": "47dae4dd7be2256e382c3d5e8776e2582a0f79177468ba2c53fc90a7c73a10c0",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2403.08291"
+  },
+  "2024_shao_deepseekmath-grpo.pdf": {
+    "bytes": 1844642,
+    "retrieved": "2026-11-27",
+    "sha256": "6cc20b3c5b8d25b8b53868fc4ec1792c144f07d67bdf7395138efd4422197e7b",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2402.03300"
+  },
+  "2025_bendinelli_llm-agents-cleaning-tabular.pdf": {
+    "bytes": 369052,
+    "retrieved": "2026-11-27",
+    "sha256": "762cdd5492596807879c20e6ff54db1ee4a6c457d8eea843f40eb10d37e3bb4b",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2503.06664"
+  },
+  "2026_featuretools_dfs-docs.html": {
+    "bytes": 55022,
+    "retrieved": "2026-11-27",
+    "sha256": "69c5a415b33a459cd0ab50cd1635c055dc664612848972084cb6f5cae743032e",
+    "status": "ok",
+    "url": "https://featuretools.alteryx.com/en/stable/getting_started/afe.html"
+  },
+  "2026_greatexpectations_docs-home.html": {
+    "bytes": 27396,
+    "retrieved": "2026-11-27",
+    "sha256": "3632974a0403885ac39f4e2b0674de6d0b7e7f059ae2ff938999261261804e31",
+    "status": "ok",
+    "url": "https://docs.greatexpectations.io/docs/home/"
+  },
+  "2026_openenv_github.html": {
+    "bytes": 338474,
+    "retrieved": "2026-11-27",
+    "sha256": "dfcd6434b5a8273fb7a9a955496de82bb7e6780567c176844bc5e050f96cb4a7",
+    "status": "ok",
+    "url": "https://github.com/meta-pytorch/OpenEnv"
+  },
+  "2026_openfe_github-readme.html": {
+    "bytes": 228276,
+    "retrieved": "2026-11-27",
+    "sha256": "dcd772f32571d758de15da164e225005bdd09a83c803e736c5a36625f89d4b4f",
+    "status": "ok",
+    "url": "https://github.com/IIIS-Li-Group/OpenFE"
+  },
+  "2026_optuna_docs.html": {
+    "bytes": 28019,
+    "retrieved": "2026-11-27",
+    "sha256": "43cc8733950624e5d1bc8a3f0c51d85bf6866f9c777b4554f8c88e92ca3e2126",
+    "status": "ok",
+    "url": "https://optuna.readthedocs.io/en/stable/"
+  },
+  "2026_sb3_ppo.html": {
+    "bytes": 99990,
+    "retrieved": "2026-11-27",
+    "sha256": "3a47e76069bb7ddcdea20a84de8cf8c3089995d151a19fd6b6cadeb6ffc95923",
+    "status": "ok",
+    "url": "https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html"
+  },
+  "2026_sklearn_feature-selection.html": {
+    "bytes": 79921,
+    "retrieved": "2026-11-27",
+    "sha256": "b41f259104dcb672d994ee9419ecaebbbb10a383573613ad47b959e04a131109",
+    "status": "ok",
+    "url": "https://scikit-learn.org/stable/modules/feature_selection.html"
+  },
+  "2026_sklearn_impute.html": {
+    "bytes": 90935,
+    "retrieved": "2026-11-27",
+    "sha256": "1680c08af6af85909735b105f9dba435c7f36a37fffe6701fac533ad7688da51",
+    "status": "ok",
+    "url": "https://scikit-learn.org/stable/modules/impute.html"
+  },
+  "2026_sklearn_isolation-forest.html": {
+    "bytes": 79670,
+    "retrieved": "2026-11-27",
+    "sha256": "aa6589920bbd0e47dddad1aa44f7f6ff32e36214ad05f069f99287ccd982ca54",
+    "status": "ok",
+    "url": "https://scikit-learn.org/stable/modules/outlier_detection.html"
+  },
+  "2026_sklearn_preprocessing-target-encoder.html": {
+    "bytes": 205707,
+    "retrieved": "2026-11-27",
+    "sha256": "c677d19e840dacfc9ff26501708f525f39bb77ed60123c9cb58d232ab6bd6fe0",
+    "status": "ok",
+    "url": "https://scikit-learn.org/stable/modules/preprocessing.html"
+  },
+  "2026_survey_llm-data-preparation.pdf": {
+    "bytes": 11137622,
+    "retrieved": "2026-11-27",
+    "sha256": "e7127aec12867cb644a1734fe032a8e561b07a91b21c26056bce21043c130590",
+    "status": "ok",
+    "url": "https://arxiv.org/pdf/2601.17058"
+  },
+  "2026_tensorflow_tfdv-guide.html": {
+    "bytes": 138496,
+    "retrieved": "2026-11-27",
+    "sha256": "03103a936bbb818e94c7391e6d3aa308e4da785c2a74d4b7d6887d95b5be157f",
+    "status": "ok",
+    "url": "https://www.tensorflow.org/tfx/guide/tfdv"
+  },
+  "2026_trl_grpo-trainer.html": {
+    "bytes": 758346,
+    "retrieved": "2026-11-27",
+    "sha256": "849ab5b365da73738ef58e2576e9c4ee6b1680f5b22dd432862a2e89185aa652",
+    "status": "ok",
+    "url": "https://huggingface.co/docs/trl/grpo_trainer"
+  },
+  "2026_trl_sft-trainer.html": {
+    "bytes": 330020,
+    "retrieved": "2026-11-27",
+    "sha256": "82f70cfda4451151cfebca00de5e4b3b6229b48ccd1c01faf32625ae6107a16b",
+    "status": "ok",
+    "url": "https://huggingface.co/docs/trl/sft_trainer"
+  }
+}

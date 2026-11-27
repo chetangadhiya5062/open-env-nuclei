@@ -12,3 +12,10 @@ build/
 .coverage
 data-cleaning-env/
 benchmark_results/
+ff_workspace/
+ff_output/
+training/runs/
+*.db
+# local copies of reference papers/snapshots: kept on disk, not in the public repo (see docs/references/INDEX.md)
+docs/references/*.pdf
+docs/references/*.html

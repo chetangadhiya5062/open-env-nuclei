@@ -1,0 +1,40 @@
+# python -m training.tune_ppo --config training/configs/ppo_optuna.yaml
+base_config: training/configs/ppo.yaml
+base_overrides:
+  total_timesteps: 300000      # budget per trial
+  eval_every: 50000            # each validation is one pruning checkpoint
+  plot: false
+study_name: ppo-data-cleaning
+seed: 0
+n_trials: 40
+timeout_seconds: 43200         # 12 h hard stop
+startup_trials: 8
+search_space:
+  learning_rate: {type: float, low: 1.0e-5, high: 1.0e-3, log: true}
+  n_steps: {type: categorical, choices: [128, 256, 512, 1024]}
+  batch_size: {type: categorical, choices: [64, 128, 256, 512]}
+  n_epochs: {type: int, low: 3, high: 20}
+  gamma: {type: categorical, choices: [0.95, 0.98, 0.99, 0.995]}
+  gae_lambda: {type: float, low: 0.8, high: 0.99}
+  clip_range: {type: categorical, choices: [0.1, 0.2, 0.3]}
+  ent_coef: {type: float, low: 1.0e-4, high: 0.05, log: true}
+  net_width: {type: categorical, choices: [64, 128, 256]}
+
+smoke:
+  n_trials: 2
+  startup_trials: 1
+  timeout_seconds: 600
+  base_overrides:
+    device: cpu
+    n_envs: 2
+    subprocess: false
+    total_timesteps: 128
+    eval_every: 1000000
+    validation_seeds: [50]
+    plot: false
+    plot_baselines: false
+  search_space:
+    learning_rate: {type: float, low: 1.0e-4, high: 1.0e-3, log: true}
+    n_steps: {type: categorical, choices: [64]}
+    batch_size: {type: categorical, choices: [64]}
+    n_epochs: {type: int, low: 1, high: 2}

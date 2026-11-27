@@ -1,0 +1,24 @@
+# python -m training.tune_sft --config training/configs/sft_optuna.yaml
+base_config: training/configs/sft.yaml
+base_overrides:
+  train:
+    max_steps: 300              # short budget per trial
+    eval_strategy: "no"
+    save_strategy: "no"
+    load_best_model_at_end: false
+  data:
+    limit_val: 300
+study_name: sft-data-cleaning
+seed: 0
+n_trials: 16
+timeout_seconds: 28800          # 8 h hard stop
+search_space:
+  learning_rate: {type: float, low: 2.0e-5, high: 5.0e-4, log: true}
+  lora_r: {type: categorical, choices: [8, 16, 32, 64]}
+  lora_lora_alpha: {type: categorical, choices: [16, 32, 64]}
+  lora_lora_dropout: {type: float, low: 0.0, high: 0.1}
+
+smoke:
+  n_trials: 2
+  base_overrides:
+    train: {max_steps: 1, eval_strategy: "no", save_strategy: "no", load_best_model_at_end: false}
