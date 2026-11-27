@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.1 (branch v4.1-cleanup)
+
+### Changed
+- Product packages moved to the optional `[app]` extra (`pip install -e ".[app]"`); the core install and the
+  Hugging Face Space `requirements.txt` contain only the environment's dependencies. `[dev]` includes `[app]`.
+- Leak handling is a setting: `leak_policy: auto | drop | warn` (recipe step `drop_columns`, `auto_recipe`,
+  `fe auto/run --leak-policy`, API `leak_policy`, dashboard toggle). Default `auto` drops high-confidence leaks and
+  warns about medium-confidence ones. Findings and actions are listed in the step report, run summary, HTML report
+  ("Target leak check"), dataset card and CLI output.
+- 4-bit (QLoRA) model loading for GRPO and LLM evaluation as well as SFT; runbook section "Choosing the model" with
+  VRAM guidance and the Llama licence steps. Default model unchanged (Qwen2.5-1.5B-Instruct).
+- Removed references to the coding tool from older docs.
+
+### Added
+- `featureforge.profile.detect_leaks` (confidence levels), 9 tests (192 total).
+
 ## 0.4.0 (branch v4-feature-engineering, unreleased)
 
 ### Added
