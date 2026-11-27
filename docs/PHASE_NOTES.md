@@ -217,7 +217,6 @@ exactly 1.0 to the ground truth. CI runs lint, tests on three Python versions an
 5. Default `reset()` with no arguments = `easy-clean`, seed 42 (deterministic).
 6. Git identity: the repo had no local git user, so I set a **repo-local** `user.name=Chetan Gadhiya`,
    `user.email=chetangadhiya4939@gmail.com` for the commits. Change with `git config --local` and amend if you like.
-   Commits carry a `Co-Authored-By: Claude` trailer.
 7. Python: your PC had no Python, so I used `uv` to create `.venv` (Python 3.11). `.venv/` is git-ignored.
 8. Not done, by instruction: Phase 5 (Gradio UI, full README rewrite, resume bullet), Phase 6, push and PR.
    The README is still the short honest Phase 1 version and does not yet describe the new environment in detail.
