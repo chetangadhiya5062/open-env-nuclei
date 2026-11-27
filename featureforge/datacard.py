@@ -94,6 +94,18 @@ def build_datacard(
             )
         )
         lines.append("")
+        leaks = pipeline_summary.get("leaks") or []
+        if leaks:
+            lines.append("")
+            lines.append("Target-leak check (columns that copy or determine the target):")
+            lines.append("")
+            lines.append(
+                _table(
+                    [[f"`{x['column']}`", x["code"], x["confidence"], x["nmi"], x["action"]] for x in leaks],
+                    ["column", "finding", "confidence", "normalised MI", "action"],
+                )
+            )
+            lines.append("")
         lines.append("All statistics (imputation values, encodings, bounds, selected features) were learned on the")
         lines.append("training data only and are stored in `pipeline.joblib`; `recipe.yaml` reproduces the run.")
     else:

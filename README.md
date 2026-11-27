@@ -11,7 +11,7 @@ it grew out of, which is used as an independent benchmark for the cleaning part.
 - **One click or full control.** Auto mode builds a recipe from the data; every step is a plain, editable YAML entry.
 - **Leakage-safe by construction.** Every statistic is learned with `fit` on training data and replayed with
   `transform`; target encoding is out-of-fold; the train/test split keeps duplicates and groups on one side; columns
-  that leak the target are flagged and dropped by auto mode.
+  that leak the target are flagged, and a leak policy (`auto` / `drop` / `warn`) decides what to drop.
 - **Reproducible artifacts.** `recipe.yaml` + `pipeline.joblib` + `metadata.json`, an HTML quality report and a
   dataset card (Datasheets for Datasets) for every run.
 - **Research-based.** Each technique is tied to its paper in [docs/RESEARCH.md](docs/RESEARCH.md); every source is
@@ -66,8 +66,11 @@ git clone https://github.com/chetangadhiya5062/open-env-nuclei.git
 cd open-env-nuclei
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install -e ".[app]"        # the product; ".[dev]" also installs tests, lint and RL training tools
 ```
+
+In Command Prompt (cmd) activate with `.venv\Scripts\activate.bat` instead of `Activate.ps1`. The core install
+(`pip install -e .`, also what the Hugging Face Space uses) is only the environment; the product needs `[app]`.
 
 **Dashboard + API** (open <http://localhost:8000/ui>, API docs at <http://localhost:8000/docs>):
 
@@ -88,6 +91,7 @@ fe profile churn.csv --target churned --out report.html            # quality rep
 fe auto churn.csv --target churned --level standard --out recipe.yaml
 fe run churn.csv --recipe recipe.yaml --out-dir out                # or without --recipe: auto mode
 fe run churn.csv --target churned --test-size 0.2 --out-dir out    # leakage-safe split, fit on train only
+fe run churn.csv --target churned --leak-policy warn               # keep possible leaks, only report them
 fe transform new_customers.csv --pipeline out/pipeline --out new_features.parquet
 fe drift churn.csv new_customers.csv
 ```
@@ -179,7 +183,7 @@ category vocabulary, so aliases such as `NY -> New York` stay unfixed (only case
 (`training/fe_benchmark.py`: 5-fold CV with the pipeline fitted inside every fold, plus an untouched holdout) is
 prepared for the GPU machine; see [training/GPU_RUNBOOK.md](training/GPU_RUNBOOK.md).
 
-**Quality:** 183 pytest tests (library, steps, leakage checks, API, CLI, dashboard handlers, training prep, environment),
+**Quality:** 192 pytest tests (library, steps, leakage checks, API, CLI, dashboard handlers, training prep, environment),
 ruff lint + format clean, CI on Python 3.10-3.12 with Docker builds and a CPU smoke run of every training script.
 
 ## Research basis
@@ -287,15 +291,16 @@ models/              trained PPO policy (v3)
 docker/, docker-compose.yml   product image + compose for product and environment
 scripts/             Space deploy, reference fetcher, library-on-environment evaluation
 docs/                RESEARCH.md, references/, PHASE_NOTES.md, benchmarks/
-tests/               pytest suite (183 tests)
+tests/               pytest suite (192 tests)
 ```
 
 ## Limitations
 
 - Type inference is heuristic: codes stored as numbers (zip codes, product IDs) need a `type_overrides` entry.
 - Imputation is single imputation; indicator columns mark imputed cells.
-- Auto mode drops columns flagged as possible target leaks; check the warning, then keep a column by removing it
-  from `drop_columns` if it is truly available at prediction time.
+- Leak policy `auto` (default) drops high-confidence target leaks and only warns about medium-confidence ones;
+  check the "Target leak check" section of the report. Use `--leak-policy warn` to keep everything or `drop` to drop
+  every flagged column.
 - Pipelines are stored with joblib (pickle): only load artifacts you created. The API never loads uploaded pipelines.
 - One server process stores runs on local disk (`FF_WORK_DIR`); multi-node deployments need shared storage.
 - The environment's data is synthetic; its results do not transfer to real data automatically.

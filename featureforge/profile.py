@@ -30,6 +30,7 @@ HIGH_MISSING = 0.30
 CRITICAL_MISSING = 0.80
 HIGH_CORRELATION = 0.95
 LEAK_NMI = 0.95
+LEAK_NMI_HIGH = 0.99  # at or above: "high" confidence leak (dropped by the default leak policy)
 SKEW_LIMIT = 2.0
 IMBALANCE = 0.05
 
@@ -158,8 +159,71 @@ def _column_profile(s: pd.Series, ctype: ColumnType, n_rows_full: int, missing_f
     return prof
 
 
-def _warn(out: List[dict], code: str, severity: str, message: str, column: Optional[str] = None) -> None:
-    out.append({"code": code, "severity": severity, "column": column, "message": message})
+def _warn(out: List[dict], code: str, severity: str, message: str, column: Optional[str] = None, **extra: Any) -> None:
+    out.append({"code": code, "severity": severity, "column": column, "message": message, **extra})
+
+
+def _leak_candidate(x: pd.Series, y: pd.Series, column: str, ctype: ColumnType, n: int) -> Optional[Dict[str, Any]]:
+    """Leak finding for one feature column, or None. ``x`` and ``y`` are aligned and ``y`` has no nulls."""
+    if ctype in (ColumnType.CONSTANT, ColumnType.ID):
+        return None
+    if x.astype(str).reset_index(drop=True).equals(y.astype(str).reset_index(drop=True)):
+        return {
+            "column": column,
+            "code": "target_copy",
+            "confidence": "high",
+            "nmi": 1.0,
+            "message": "column is identical to the target (leak)",
+        }
+    score = normalized_mi(x, y)
+    if score >= LEAK_NMI and x.nunique() < 0.5 * max(1, n):
+        return {
+            "column": column,
+            "code": "possible_target_leak",
+            "confidence": "high" if score >= LEAK_NMI_HIGH else "medium",
+            "nmi": round(score, 4),
+            "message": f"this column alone determines the target (normalised MI {score:.2f}); check it is known at "
+            "prediction time",
+        }
+    return None
+
+
+def _as_comparable(s: pd.Series, ctype: ColumnType) -> pd.Series:
+    if ctype == ColumnType.NUMERIC:
+        return parse_numeric(s)
+    if ctype == ColumnType.DATETIME:
+        dt = parse_datetime(s)
+        return dt.astype("int64").where(dt.notna())
+    return s
+
+
+def detect_leaks(
+    df: pd.DataFrame,
+    target: str,
+    types: Optional[Dict[str, ColumnType]] = None,
+    sample_rows: int = 50_000,
+    random_state: int = 0,
+) -> List[Dict[str, Any]]:
+    """Columns that copy or (almost) determine the target (Kaufman et al. 2012).
+
+    Each finding: ``column``, ``code`` (``target_copy`` | ``possible_target_leak``), ``confidence`` (``high`` when the
+    column is identical to the target or normalised MI >= 0.99, otherwise ``medium``), ``nmi`` and ``message``.
+    """
+    sdf = df.sample(sample_rows, random_state=random_state) if len(df) > sample_rows else df
+    types = types or infer_types(sdf)
+    y = sdf[target]
+    task = infer_task(y)
+    yv = y if task == "classification" else parse_numeric(y)
+    mask = yv.notna()
+    out = []
+    for c in sdf.columns:
+        t = types.get(c, ColumnType.CATEGORICAL)
+        if c == target:
+            continue
+        found = _leak_candidate(_as_comparable(sdf[c], t)[mask], yv[mask], c, t, int(mask.sum()))
+        if found:
+            out.append(found)
+    return out
 
 
 def profile(
@@ -313,24 +377,19 @@ def _target_section(
     for c, t in types.items():
         if c == target or t in (ColumnType.CONSTANT,):
             continue
-        x = sdf[c][mask]
-        if t == ColumnType.NUMERIC:
-            x = parse_numeric(x)
-        elif t == ColumnType.DATETIME:
-            x = parse_datetime(x).astype("int64").where(parse_datetime(x).notna())
+        x = _as_comparable(sdf[c], t)[mask]
         score = normalized_mi(x, yv[mask])
         assoc.append({"column": c, "nmi": round(score, 4)})
-        same = x.astype(str).reset_index(drop=True).equals(yv[mask].astype(str).reset_index(drop=True))
-        if same:
-            _warn(warnings_, "target_copy", "critical", "column is identical to the target (leak)", c)
-        elif score >= LEAK_NMI and t != ColumnType.ID and sdf[c].nunique() < 0.5 * max(1, mask.sum()):
+        leak = _leak_candidate(x, yv[mask], c, t, int(mask.sum()))
+        if leak:
             _warn(
                 warnings_,
-                "possible_target_leak",
+                leak["code"],
                 "critical",
-                f"this column alone determines the target (normalised MI {score:.2f}); check it is known at "
-                "prediction time",
+                f"{leak['message']} [{leak['confidence']} confidence]",
                 c,
+                confidence=leak["confidence"],
+                nmi=leak["nmi"],
             )
         if tname and len(tname) > 2 and tname in c.casefold():
             _warn(warnings_, "target_name_in_column", "warning", f"name contains the target name {target!r}", c)

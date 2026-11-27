@@ -69,3 +69,9 @@ def test_space_deploy_folder_is_clean_and_uses_the_space_card(tmp_path):
     assert not [f for f in files if "__pycache__" in f or f.endswith(".pyc")]
     readme = (tmp_path / "space" / "README.md").read_text(encoding="utf-8")
     assert readme.startswith("---\n") and "app_port: 7860" in readme and "sdk: docker" in readme
+
+
+def test_dev_extra_contains_the_product_extra():
+    tomllib = pytest.importorskip("tomllib")
+    extras = tomllib.loads(_read("pyproject.toml"))["project"]["optional-dependencies"]
+    assert {_norm_req(d) for d in extras["app"]} <= {_norm_req(d) for d in extras["dev"]}

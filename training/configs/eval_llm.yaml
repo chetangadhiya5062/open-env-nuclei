@@ -1,6 +1,7 @@
 # python -m training.evaluate_llm --config training/configs/eval_llm.yaml --set adapter=training/runs/sft/<run>/adapter
 model:
   name: Qwen/Qwen2.5-1.5B-Instruct   # base model of the adapter
+  load_in_4bit: false               # true for 7-8B models on a small GPU
 adapter: null                        # LoRA adapter folder; null = zero-shot base model
 label: null                          # name in the results table (default: run folder name)
 device: auto

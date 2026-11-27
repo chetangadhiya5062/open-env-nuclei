@@ -2,8 +2,10 @@
 
 Levels
 ------
-Columns the profiler flags as target leaks (``target_copy``, ``possible_target_leak``) are dropped by the first step;
-remove them from ``drop_columns`` to keep them.
+Target leaks are handled by ``leak_policy`` (a parameter of the first ``drop_columns`` step, re-checked on the
+training data at fit time): ``auto`` (default) drops high-confidence leaks (a copy of the target, or normalised MI
+>= 0.99) and keeps medium-confidence ones with a warning; ``drop`` drops every flagged column; ``warn`` drops none.
+Every finding and the action taken appear in the step report, the HTML report and the dataset card.
 
 * ``clean``    cleaning only (drop unusable columns, normalise strings, fix types, deduplicate, cap outliers, impute)
 * ``standard`` clean + datetime / text features, skew transforms, categorical encoding (default)
@@ -21,6 +23,7 @@ from .recipe import Recipe, StepSpec
 from .types import ColumnType, infer_types
 
 Level = Literal["clean", "standard", "full"]
+LeakPolicy = Literal["auto", "drop", "warn"]
 ONE_HOT_MAX = 15
 
 
@@ -35,10 +38,13 @@ def auto_recipe(
     id_columns: Optional[List[str]] = None,
     report: Optional[Dict[str, Any]] = None,
     name: str = "auto",
+    leak_policy: LeakPolicy = "auto",
 ) -> Recipe:
     """Recipe tailored to ``df``. Pass a precomputed ``report`` (from :func:`profile`) to avoid profiling twice."""
     if target is not None and target not in df.columns:
         raise KeyError(f"target column {target!r} not found")
+    if leak_policy not in ("auto", "drop", "warn"):
+        raise ValueError("leak_policy must be auto, drop or warn")
     report = report or profile(df, target=target)
     types = {c["name"]: ColumnType(c["type"]) for c in report["columns"]}
     cols = {c["name"]: c for c in report["columns"]}
@@ -56,16 +62,14 @@ def auto_recipe(
     def any_type(*kinds: ColumnType) -> bool:
         return any(t in kinds for t in feats.values())
 
-    leaks = sorted(
-        {
-            w["column"]
-            for w in report["warnings"]
-            if w["code"] in ("target_copy", "possible_target_leak") and w["column"] in feats
-        }
-    )
-    for c in leaks:
-        feats.pop(c)
-    steps: List[StepSpec] = [_step("drop_columns", columns=leaks, drop_constant=True, max_missing=0.95)]
+    for w in report["warnings"]:  # columns the leak policy is expected to drop: do not build features from them
+        if w["code"] in ("target_copy", "possible_target_leak") and w["column"] in feats:
+            if leak_policy == "drop" or (leak_policy == "auto" and w.get("confidence", "high") == "high"):
+                feats.pop(w["column"])
+    first = _step("drop_columns", drop_constant=True, max_missing=0.95)
+    if target:
+        first.params["leak_policy"] = leak_policy
+    steps: List[StepSpec] = [first]
     steps.append(_step("normalize_strings"))
     if any_type(ColumnType.NUMERIC, ColumnType.DATETIME, ColumnType.BOOLEAN):
         steps.append(_step("fix_types"))
@@ -114,7 +118,7 @@ def auto_recipe(
             steps.append(_step("correlation_filter", threshold=0.97))
     return Recipe(
         name=name,
-        description=f"auto-generated ({level}) for {report['dataset']['rows']} rows x {report['dataset']['columns']} columns",
+        description=f"auto-generated ({level}, leak policy {leak_policy if target else 'n/a'}) for {report['dataset']['rows']} rows x {report['dataset']['columns']} columns",
         target=target,
         task=task if target else "none",
         id_columns=[c for c in (id_columns or []) if c in df.columns]

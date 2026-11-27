@@ -31,13 +31,24 @@ class DropColumnsParams(_P):
     drop_constant: bool = True
     max_missing: Optional[float] = Field(0.95, ge=0, le=1, description="drop columns with more missing; null = off")
     drop_ids: bool = False
+    leak_policy: Optional[Literal["auto", "drop", "warn"]] = Field(
+        None,
+        description="target-leak check on the training data: auto = drop high-confidence leaks and warn about the "
+        "rest, drop = drop every flagged column, warn = drop none; null = no check",
+    )
+
+
+LEAK_POLICIES = ("auto", "drop", "warn")
 
 
 @register
 class DropColumns(Step):
     name = "drop_columns"
     kind = "clean"
-    description = "Drop listed columns, constant columns and columns that are (almost) entirely missing."
+    description = (
+        "Drop listed columns, constant columns, (almost) entirely missing columns and, by leak policy, columns that "
+        "leak the target."
+    )
     Params = DropColumnsParams
 
     def fit(self, df: pd.DataFrame, ctx: FitContext) -> "DropColumns":
@@ -55,7 +66,30 @@ class DropColumns(Step):
                 drop.append(c)
         if p.drop_ids:
             drop += [c for c in ctx.id_columns if c in df.columns and c not in drop]
+        self.leaks_: List[Dict[str, object]] = []
+        if p.leak_policy and ctx.target and ctx.target in df.columns:
+            from ..profile import detect_leaks
+
+            for leak in detect_leaks(df, ctx.target, ctx.types, random_state=ctx.random_state):
+                c = leak["column"]
+                if c in ctx.protected:
+                    continue
+                remove = p.leak_policy == "drop" or (p.leak_policy == "auto" and leak["confidence"] == "high")
+                if c in drop:
+                    leak["action"] = "dropped (listed)"
+                elif remove:
+                    drop.append(c)
+                    leak["action"] = "dropped"
+                else:
+                    leak["action"] = "kept (warning)"
+                self.leaks_.append(leak)
+            if self.leaks_:
+                desc = "; ".join(f"{x['column']} ({x['code']}, {x['confidence']}): {x['action']}" for x in self.leaks_)
+                self.note(f"target-leak check (policy {p.leak_policy}): {desc}")
+            else:
+                self.note(f"target-leak check (policy {p.leak_policy}): no leaks found")
         self.drop_ = drop
+        ctx.dropped |= set(drop)
         for c in drop:
             ctx.types.pop(c, None)
         if drop:

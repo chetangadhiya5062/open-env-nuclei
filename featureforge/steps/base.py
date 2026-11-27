@@ -42,6 +42,7 @@ class FitContext:
     random_state: int = 42
     max_fit_rows: int = 20_000
     classes: Optional[List[Any]] = None
+    dropped: Set[str] = field(default_factory=set)  # columns removed by earlier steps (drop_columns, selection)
 
     @property
     def protected(self) -> Set[str]:
@@ -62,10 +63,10 @@ class FitContext:
         """Columns to act on: the ``requested`` ones (validated) or every column of the given ``kinds``."""
         exclude = self.protected if exclude is None else exclude
         if requested is not None:
-            missing = [c for c in requested if c not in df.columns]
-            if missing:
-                raise StepError(f"columns not found: {missing}")
-            return [c for c in requested if c not in exclude]
+            unknown = [c for c in requested if c not in df.columns and c not in self.dropped]
+            if unknown:
+                raise StepError(f"columns not found: {unknown}")
+            return [c for c in requested if c not in exclude and c in df.columns]
         kinds = set(kinds)
         return [c for c in df.columns if c not in exclude and self.types.get(c) in kinds]
 

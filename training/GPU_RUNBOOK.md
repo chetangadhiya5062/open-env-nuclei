@@ -28,9 +28,23 @@ df -h .                         # ~30 GB free for model downloads and checkpoint
 nproc                           # CPU cores (PPO and the FE benchmark use them)
 ```
 
-Memory guide for job B/C with the default `Qwen/Qwen2.5-1.5B-Instruct` + LoRA in bf16: about 12-20 GB GPU memory with
-`per_device_train_batch_size: 4` and gradient checkpointing (estimate; check with `nvidia-smi` during the first
-minutes). For 7-8B models use `model.load_in_4bit=true` (QLoRA, needs `bitsandbytes`).
+### Choosing the model (one override, same for every LLM command)
+
+The default everywhere is `Qwen/Qwen2.5-1.5B-Instruct`. To switch, add the same `--set` to **every** LLM command
+(`train_sft`, `tune_sft`, `train_grpo`, `evaluate_llm`), because an adapter only works with its own base model:
+
+| Model | Method | GPU memory (rough estimate) | Add to each command |
+|---|---|---|---|
+| Qwen2.5-1.5B-Instruct (default) | LoRA, bf16 | ~16 GB (12-20 GB with batch 4 + gradient checkpointing) | nothing |
+| Qwen2.5-7B-Instruct | QLoRA, 4-bit | ~24 GB | `--set model.name=Qwen/Qwen2.5-7B-Instruct model.load_in_4bit=true` |
+| Llama-3.1-8B-Instruct (v3 benchmark model) | QLoRA, 4-bit | ~24 GB | `--set model.name=meta-llama/Llama-3.1-8B-Instruct model.load_in_4bit=true` |
+| Llama-3.1-8B-Instruct | LoRA, bf16 | ~40 GB or more | `--set model.name=meta-llama/Llama-3.1-8B-Instruct` |
+
+- 4-bit loading needs `pip install bitsandbytes` (Linux + CUDA).
+- **Llama is gated:** open https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct while logged in, accept Meta's
+  licence, wait for the approval e-mail, then run `hf auth login` on the GPU machine and paste a read token into that
+  prompt (never into a file in the repo). Qwen needs no login.
+- These numbers are estimates; watch `nvidia-smi` in the first minutes. If memory runs out, see Troubleshooting.
 
 ## 1. Get the code and install
 
@@ -97,7 +111,7 @@ cat training/runs/sft_optuna/search1/best.json         # "set_args"
 # B. SFT (2 epochs over ~14.4k examples)
 python -m training.train_sft --run-name sft1 2>&1 | tee training/logs/sft.log
 #    with the search result:  python -m training.train_sft --run-name sft1 --set train.learning_rate=... lora.r=...
-#    bigger model:            --set model.name=Qwen/Qwen2.5-7B-Instruct model.load_in_4bit=true
+#    other model:             see "Choosing the model" (use the same --set on every LLM command)
 
 # D1. evaluate the SFT adapter on test seeds 0-9
 python -m training.evaluate_llm --run-name sft1 --set adapter=training/runs/sft/sft1/adapter

@@ -1,7 +1,7 @@
 # Brief 2 - finish, deploy, and make it learn
 
 Context: this is my project "open-env-nuclei" (https://github.com/chetangadhiya5062/open-env-nuclei). Phases 1-5 of
-../CLAUDE_CODE_PROMPT.md are DONE and merged to `main` via PR #8. Read docs/PHASE_NOTES.md and README.md first so you
+the first project brief are DONE and merged to `main` via PR #8. Read docs/PHASE_NOTES.md and README.md first so you
 know what exists. An independent review confirmed: 79 tests pass, ruff clean, benchmark numbers reproduce exactly.
 
 I'm on Windows, PowerShell. I'm a student; after every part, add a short "what changed, why, and how I'd explain it

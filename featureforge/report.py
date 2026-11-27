@@ -69,6 +69,13 @@ details{margin:6px 0} summary{cursor:pointer;font-weight:600} code{font-size:12p
 <p>Target <code>{{ p.target.name }}</code>, task <b>{{ p.target.task }}</b>{% if p.target.classes %}; classes: {% for k, v in p.target.classes.items() %}{{ k }} {{ pct(v) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.</p>
 {% endif %}
 
+{% if leaks is not none %}<h2>Target leak check</h2>
+{% if leaks %}<div class="scroll"><table><tr><th>Column</th><th>Finding</th><th>Confidence</th><th>Normalised MI</th><th>Action</th></tr>
+{% for l in leaks %}<tr><td><code>{{ l.column }}</code></td><td>{{ l.code }}</td><td>{{ l.confidence }}</td><td>{{ l.nmi }}</td><td>{{ l.action }}</td></tr>{% endfor %}
+</table></div>{% else %}<p>No column copies or determines the target.</p>{% endif %}
+<p class="muted">Leak policy <b>{{ leak_policy }}</b>: auto drops high-confidence leaks and keeps the rest with a warning; drop removes every flagged column; warn removes none.</p>
+{% endif %}
+
 {% if steps %}<h2>Pipeline</h2>
 <div class="scroll"><table><tr><th>#</th><th>Step</th><th>Rows</th><th>Columns</th><th>Added / removed</th><th>Notes</th></tr>
 {% for s in steps %}<tr><td>{{ s.index }}</td><td><code>{{ s.step }}</code></td><td>{{ s.rows_before }} &rarr; {{ s.rows_after }}</td>
@@ -110,6 +117,8 @@ def render_report(
     preview: Optional[pd.DataFrame] = None,
     source: Optional[str] = None,
     max_column_charts: int = 40,
+    leaks: Optional[List[Dict[str, Any]]] = None,
+    leak_policy: Optional[str] = None,
 ) -> str:
     from . import __version__
 
@@ -141,6 +150,8 @@ def render_report(
         steps=steps,
         shape_chart=charts.to_base64(charts.pipeline_shape(steps or [])),
         drift=drift,
+        leaks=leaks,
+        leak_policy=leak_policy,
         preview=preview_html,
         pct=_pct,
         fmt=_fmt,

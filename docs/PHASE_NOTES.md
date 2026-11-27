@@ -217,7 +217,6 @@ exactly 1.0 to the ground truth. CI runs lint, tests on three Python versions an
 5. Default `reset()` with no arguments = `easy-clean`, seed 42 (deterministic).
 6. Git identity: the repo had no local git user, so I set a **repo-local** `user.name=Chetan Gadhiya`,
    `user.email=chetangadhiya4939@gmail.com` for the commits. Change with `git config --local` and amend if you like.
-   Commits carry a `Co-Authored-By: Claude` trailer.
 7. Python: your PC had no Python, so I used `uv` to create `.venv` (Python 3.11). `.venv/` is git-ignored.
 8. Not done, by instruction: Phase 5 (Gradio UI, full README rewrite, resume bullet), Phase 6, push and PR.
    The README is still the short honest Phase 1 version and does not yet describe the new environment in detail.
@@ -506,28 +505,51 @@ Optuna searches and a runbook, all smoke-tested on CPU."
 
 ## Decisions needed (owner)
 
-1. **Push and PR.** Branch `v4-feature-engineering` is committed locally only. Pushing to GitHub, opening a PR and
-   redeploying the Hugging Face Space all need your go-ahead.
-2. **Reference PDFs (decided).** Your choice: the 27 PDFs and 13 HTML snapshots (about 70 MB) stay on disk in
-   `docs/references/` but are git-ignored and were never committed to this branch, so a public push contains none of
-   them. `INDEX.md`, the citation notes, `fetch_log.json` and `scripts/fetch_references.py` are tracked. Still open:
-   create the separate private repository for the papers.
-3. **Product name.** "FeatureForge" and the CLI name `fe` are working names; check for existing trademarks and
+Resolved: push and PR (merged as PR #11), reference PDFs (local only, see `docs/references/INDEX.md`), Space
+dependencies, base LLM, leak handling and the older tool mentions; see "v4.1 cleanup" below.
+
+1. **Product name.** "FeatureForge" and the CLI name `fe` are working names; check for existing trademarks and
    package names before selling it under that name.
-4. **Dependencies on the Space.** The product dependencies are now part of `requirements.txt`, which also builds the
-   environment's Hugging Face Space image (bigger image). Alternative: move them to an optional `[app]` extra.
-5. **Base LLM for fine-tuning.** Default is `Qwen/Qwen2.5-1.5B-Instruct` (open licence, no gated access). The v3
-   zero-shot benchmark used `meta-llama/Llama-3.1-8B-Instruct` (gated: accept the licence and `hf auth login`;
-   QLoRA on a 24 GB GPU). Pick one before the GPU session.
-6. **Docker image not built locally.** The Docker daemon was not running on this machine, so the new image was not
-   built here; the CI job builds it and calls the API. Start Docker Desktop and run `docker compose up --build` to
-   check locally.
-7. **Auto mode drops leak-flagged columns** by default. That is the safe choice; if you prefer warn-only, it is one
-   line in `featureforge/auto.py`.
-8. **Selling / hosting.** A hosted, paid service still needs user accounts and auth beyond the single API key,
+2. **Selling / hosting.** A hosted, paid service still needs user accounts and auth beyond the single API key,
    HTTPS, per-user storage and quotas, a background job queue for very large files, terms of service and a data
    retention policy (`RunStore.cleanup` deletes runs older than `FF_RUN_TTL_HOURS`, default 72, but nothing schedules
    it yet). These are product decisions rather than code changes.
-9. **Older tool mentions.** Some pre-v4 files (`docs/BRIEF_2.md`, `docs/RESUME.md`, an earlier section of this file)
-   and earlier commits on `main` still mention the coding assistant used before. v4 did not edit or rewrite them
-   (no deleting your files, no history rewrites). Say if you want those files cleaned up in a follow-up commit.
+3. **Private paper repository.** The reference PDFs/snapshots are on the project machine only; create the planned
+   private repository for them when convenient.
+
+---
+
+# v4.1 cleanup (branch `v4.1-cleanup`)
+
+## What changed
+
+- **Optional `[app]` extra.** The product packages (scikit-learn, scipy, pyarrow, openpyxl, joblib, pyyaml, jinja2,
+  matplotlib, typer, python-multipart) moved out of the core dependencies into `pip install -e ".[app]"`.
+  `requirements.txt` (the Hugging Face Space build) is back to the environment-only list, so the Space stays light.
+  `[dev]` contains everything in `[app]` (a hygiene test checks this); the product Docker image installs `.[app]`.
+- **Leak policy setting.** `leak_policy: auto | drop | warn` is a parameter of the `drop_columns` step (so a saved
+  recipe re-checks leaks on its own training data at fit time) and of `auto_recipe`, `fe auto/run --leak-policy`,
+  the API (`leak_policy` form field on `/v1/recipes/auto` and `/v1/runs`) and a dashboard toggle in the Pipeline tab.
+  `auto` (default) drops *high-confidence* leaks (a copy of the target, or normalised MI >= 0.99) and keeps
+  *medium-confidence* ones (0.95 <= MI < 0.99) with a warning; `drop` drops every flagged column; `warn` drops none.
+  Each finding (column, check, confidence, MI, action) is listed in the step notes, the run summary, a new
+  "Target leak check" section of the HTML report, the dataset card and the CLI output. Tests cover all three modes
+  for both confidence levels.
+- **Model choice.** Default stays `Qwen/Qwen2.5-1.5B-Instruct`. Switching to Qwen2.5-7B or Llama-3.1-8B is one
+  `--set model.name=... model.load_in_4bit=true` on each LLM command; 4-bit (QLoRA) loading now also works for GRPO
+  and evaluation, not only SFT. `training/GPU_RUNBOOK.md` has a VRAM table and the Llama licence/login steps.
+- **Older tool mentions** removed from `docs/BRIEF_2.md`, `docs/RESUME.md` and an early section of this file.
+  Commit messages were not rewritten: 13 commits on `main` from before v4 still mention the tool in their message.
+
+## Why
+
+- A light Space image deploys faster and has fewer dependencies to break; the product is a separate install.
+- Dropping every flagged column can remove a legitimately strong feature, keeping every one can silently fake model
+  quality. Splitting by confidence drops the near-certain cases and makes a human look at the rest.
+
+## Interview explanation
+
+"Leakage handling became a policy instead of a hard-coded rule: near-perfect target proxies are removed
+automatically, borderline ones are kept but reported everywhere the user looks: the step report, the HTML report,
+the dataset card and the CLI output. The policy lives in the recipe, so it is re-applied to whatever training data
+the recipe is fitted on."

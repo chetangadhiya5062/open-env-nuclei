@@ -228,10 +228,60 @@ def test_saved_pipeline_reproduces_identical_output(tmp_path):
     pd.testing.assert_frame_equal(a, c)
 
 
-def test_auto_drops_leaky_column():
+def _medium_leak_frame(n=5000, flip=0.003, seed=0):
+    """A column equal to the target except for a few flipped rows: normalised MI ~0.97 (medium confidence)."""
+    rng = np.random.default_rng(seed)
+    y = rng.integers(0, 2, n)
+    noisy = np.where(rng.random(n) < flip, 1 - y, y)
+    return pd.DataFrame({"x": rng.normal(size=n), "near_copy": np.where(noisy == 1, "yes_", "no_"), "y": y})
+
+
+def test_detect_leaks_confidence_levels():
+    from featureforge.profile import detect_leaks
+
+    churn = {x["column"]: x for x in detect_leaks(make_dataset("churn", 800, 0), "churned")}
+    assert churn["cancellation_reason"]["confidence"] == "high"
+    medium = {x["column"]: x for x in detect_leaks(_medium_leak_frame(), "y")}
+    assert medium["near_copy"]["confidence"] == "medium" and 0.95 <= medium["near_copy"]["nmi"] < 0.99
+    assert "x" not in medium
+
+
+@pytest.mark.parametrize(
+    "policy,dropped",
+    [("auto", {"cancellation_reason"}), ("drop", {"cancellation_reason"}), ("warn", set())],
+)
+def test_leak_policy_on_high_confidence_leak(policy, dropped):
     df = make_dataset("churn", 800, 0)
-    r = auto_recipe(df, "churned")
-    assert "cancellation_reason" in r.steps[0].params["columns"]
+    r = auto_recipe(df, "churned", leak_policy=policy)
+    assert r.steps[0].params["leak_policy"] == policy
+    pipe = Pipeline(r)
+    out = pipe.fit_transform(df)
+    leaks = {x["column"]: x for x in pipe.leaks()}
+    assert "cancellation_reason" in leaks
+    kept = any(c.startswith("cancellation_reason") for c in out.columns)
+    assert kept == (not dropped)
+    assert leaks["cancellation_reason"]["action"] == ("dropped" if dropped else "kept (warning)")
+    note = " ".join(pipe.report_[0].notes)
+    assert "target-leak check" in note and "cancellation_reason" in note
+
+
+@pytest.mark.parametrize("policy,kept", [("auto", True), ("drop", False), ("warn", True)])
+def test_leak_policy_on_medium_confidence_leak(policy, kept):
+    df = _medium_leak_frame()
+    pipe = Pipeline(auto_recipe(df, "y", leak_policy=policy))
+    out = pipe.fit_transform(df)
+    assert any(c.startswith("near_copy") for c in out.columns) == kept
+    assert pipe.leaks()[0]["confidence"] == "medium"
+    with pytest.raises(ValueError):
+        auto_recipe(df, "y", leak_policy="ignore")
+
+
+def test_leak_check_is_off_without_policy_or_target():
+    df = make_dataset("churn", 300, 0)
+    assert "leak_policy" not in auto_recipe(df).steps[0].params
+    pipe = Pipeline(Recipe(target="churned", steps=[StepSpec(step="drop_columns")]))
+    pipe.fit(df)
+    assert pipe.leaks() == []
 
 
 def test_input_validation_on_transform():

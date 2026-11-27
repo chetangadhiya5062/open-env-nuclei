@@ -110,6 +110,7 @@ def run_job(
     source_name: str = "upload",
     source_path: Optional[Path] = None,
     run_id: Optional[str] = None,
+    leak_policy: str = "auto",
 ) -> RunResult:
     """Run the full workflow and write all artifacts to ``out_dir``."""
     t0 = time.perf_counter()
@@ -119,7 +120,9 @@ def run_job(
         target = recipe.target
     src_profile = profile(df, target=target)
     if recipe is None:
-        recipe = auto_recipe(df, target=target, level=level, report=src_profile, name=f"auto-{level}")
+        recipe = auto_recipe(
+            df, target=target, level=level, report=src_profile, name=f"auto-{level}", leak_policy=leak_policy
+        )
     elif target is not None and recipe.target is None:
         recipe = recipe.model_copy(update={"target": target})
 
@@ -150,6 +153,8 @@ def run_job(
         write_table(test_output, out_dir / "test.parquet")
         files.update({"test.csv": "test.csv", "test.parquet": "test.parquet"})
     summary_pipe = pipe.summary()
+    policies = [s.params.get("leak_policy") for s in recipe.steps if s.step == "drop_columns" and s.enabled]
+    used_policy = next((x for x in policies if x), None)
     write_report(
         out_dir / "report.html",
         src_profile,
@@ -158,6 +163,8 @@ def run_job(
         drift=drift,
         preview=output,
         source=source_name,
+        leaks=summary_pipe["leaks"] if used_policy else None,
+        leak_policy=used_policy,
     )
     (out_dir / "profile.json").write_text(json.dumps(src_profile, indent=1, default=str), encoding="utf-8")
     hashes = {name: sha256_file(out_dir / name) for name in files}
@@ -196,6 +203,8 @@ def run_job(
         "task": pipe.ctx_.task,
         "split": split_report,
         "drifted_columns": drift["drifted"] if drift else None,
+        "leak_policy": used_policy,
+        "leaks": summary_pipe["leaks"],
         "pipeline": summary_pipe,
         "transform_warnings": pipe.warnings_,
         "files": files,

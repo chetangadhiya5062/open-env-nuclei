@@ -74,6 +74,7 @@ class VarianceFilter(Step):
             elif df[c].nunique(dropna=False) <= 1:
                 drop.append(c)
         self.drop_ = drop
+        ctx.dropped |= set(drop)
         for c in drop:
             ctx.types.pop(c, None)
         self.note(f"dropped {len(drop)} low-variance column(s)" + (f": {drop[:10]}" if drop else ""))
@@ -112,6 +113,7 @@ class CorrelationFilter(Step):
             loser = b if score.get(a, 0.0) >= score.get(b, 0.0) else a
             drop.append(loser)
         self.drop_ = drop
+        ctx.dropped |= set(drop)
         for c in drop:
             ctx.types.pop(c, None)
         self.note(f"dropped {len(drop)} highly correlated column(s)" + (f": {drop[:10]}" if drop else ""))
@@ -151,6 +153,7 @@ class MutualInfoSelect(Step):
             keep = keep[: max(1, int(round(self.params.fraction * len(cols))))]
         self.scores_ = {c: round(scores[c], 6) for c in ranked}
         self.drop_ = [c for c in cols if c not in keep]
+        ctx.dropped |= set(self.drop_)
         non_numeric = [c for c in df.columns if c not in cols and c not in ctx.protected]
         for c in self.drop_:
             ctx.types.pop(c, None)

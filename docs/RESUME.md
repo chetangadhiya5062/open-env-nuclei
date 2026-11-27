@@ -1,8 +1,7 @@
 # RESUME HERE - project paused 2026-10-10
 
 Paused by the owner to work on a higher-priority project. Everything needed to continue is in git (branch **`v3`**
-on https://github.com/chetangadhiya5062/open-env-nuclei). The task list is [BRIEF_2.md](BRIEF_2.md) (a copy of
-`CLAUDE_CODE_PROMPT_2.md`); design notes and interview explanations are in [PHASE_NOTES.md](PHASE_NOTES.md).
+on https://github.com/chetangadhiya5062/open-env-nuclei). The task list is [BRIEF_2.md](BRIEF_2.md) (the second project brief); design notes and interview explanations are in [PHASE_NOTES.md](PHASE_NOTES.md).
 
 ## To continue on any PC (PowerShell)
 ```powershell
@@ -15,7 +14,7 @@ pip install -e ".[dev]"                   # includes torch + stable-baselines3 f
 copy .env.example .env                    # then put your own HF_TOKEN in .env (never commit it)
 pytest ; ruff check . ; ruff format --check .      # expect: all green (see "State" below)
 ```
-Then tell Claude Code: "Read docs/RESUME.md and docs/BRIEF_2.md and continue from the first unfinished item."
+Then read docs/RESUME.md and docs/BRIEF_2.md and continue from the first unfinished item.
 
 ## State
 

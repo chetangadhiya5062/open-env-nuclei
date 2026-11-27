@@ -195,3 +195,33 @@ def test_report_and_datacard_content():
     card = build_datacard("churn.csv", p, out, pipe.summary(), pipe.recipe.to_yaml())
     for needle in ("## Motivation", "## Composition", "## Preprocessing", "To be completed", "deduplicate"):
         assert needle in card
+
+
+def test_leak_policy_in_api_cli_report(client, tmp_path):
+    r = client.post(
+        "/v1/runs", files={"file": ("c.csv", _csv(rows=400))}, data={"target": "churned", "leak_policy": "warn"}
+    )
+    assert r.status_code == 200
+    s = r.json()
+    assert s["leak_policy"] == "warn"
+    assert any(x["column"] == "cancellation_reason" and x["action"] == "kept (warning)" for x in s["leaks"])
+    html = client.get(f"/v1/runs/{s['run_id']}/files/report.html").text
+    assert "Target leak check" in html and "cancellation_reason" in html
+    card = client.get(f"/v1/runs/{s['run_id']}/files/datacard.md").text
+    assert "Target-leak check" in card
+    bad = client.post("/v1/runs", files={"file": ("c.csv", _csv())}, data={"leak_policy": "nope"})
+    assert bad.status_code == 422
+    r = client.post(
+        "/v1/recipes/auto", files={"file": ("c.csv", _csv())}, data={"target": "churned", "leak_policy": "drop"}
+    )
+    assert "leak_policy: drop" in r.json()["yaml"]
+
+    runner = CliRunner()
+    data = tmp_path / "d.csv"
+    make_dataset("churn", 300, 0).to_csv(data, index=False)
+    res = runner.invoke(
+        cli_app, ["run", str(data), "-t", "churned", "--leak-policy", "auto", "-o", str(tmp_path / "o")]
+    )
+    assert res.exit_code == 0 and "target leak: cancellation_reason" in res.output and "dropped" in res.output
+    res = runner.invoke(cli_app, ["auto", str(data), "-t", "churned", "--leak-policy", "bogus"])
+    assert res.exit_code == 1

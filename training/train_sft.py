@@ -46,6 +46,26 @@ def load_splits(data_dir: Path, limit_train: Optional[int] = None, limit_val: Op
     return ds
 
 
+def model_kwargs(model_cfg: Dict[str, Any], bf16: bool) -> Dict[str, Any]:
+    """``from_pretrained`` arguments: dtype, optional 4-bit QLoRA quantisation and attention implementation."""
+    import torch
+
+    kwargs: Dict[str, Any] = {"dtype": torch.bfloat16 if bf16 else torch.float32}
+    if model_cfg.get("load_in_4bit"):
+        from transformers import BitsAndBytesConfig
+
+        kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16 if bf16 else torch.float16,
+            bnb_4bit_use_double_quant=True,
+        )
+        kwargs["device_map"] = {"": 0}
+    if model_cfg.get("attn_implementation"):
+        kwargs["attn_implementation"] = model_cfg["attn_implementation"]
+    return kwargs
+
+
 def resolve_model(cfg: Dict[str, Any], data_dir: Path) -> str:
     name = cfg["model"]["name"]
     if name != "tiny-offline":
@@ -73,19 +93,7 @@ def build_trainer(cfg: Dict[str, Any], out: Path, data_dir: Path, trial_params: 
         tok.pad_token = tok.eos_token
     use_cpu = bool(tcfg.pop("use_cpu", False)) or not torch.cuda.is_available()
     bf16 = (not use_cpu) and torch.cuda.is_bf16_supported()
-    kwargs: Dict[str, Any] = {"dtype": torch.bfloat16 if bf16 else torch.float32}
-    if cfg["model"].get("load_in_4bit"):
-        from transformers import BitsAndBytesConfig
-
-        kwargs["quantization_config"] = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16 if bf16 else torch.float16,
-            bnb_4bit_use_double_quant=True,
-        )
-    if cfg["model"].get("attn_implementation"):
-        kwargs["attn_implementation"] = cfg["model"]["attn_implementation"]
-    model = AutoModelForCausalLM.from_pretrained(model_name, **kwargs)
+    model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs(cfg["model"], bf16))
     ds = load_splits(data_dir, cfg["data"].get("limit_train"), cfg["data"].get("limit_val"))
     args = SFTConfig(
         output_dir=str(out / "checkpoints"),

@@ -17,7 +17,8 @@ COPY pyproject.toml README.md LICENSE ./
 COPY featureforge ./featureforge
 COPY data_cleaning_env ./data_cleaning_env
 COPY agents ./agents
-RUN pip install --no-deps . \
+# core requirements are cached above; this adds the product extra ([app]) and the package itself
+RUN pip install ".[app]" \
     && useradd --create-home --uid 1000 app \
     && mkdir -p /data && chown app /data
 USER app

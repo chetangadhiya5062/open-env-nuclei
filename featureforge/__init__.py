@@ -20,7 +20,7 @@ from .recipe import Recipe, StepSpec
 from .split import leakage_safe_split
 from .types import ColumnType, infer_types
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 __all__ = [
     "ColumnType",

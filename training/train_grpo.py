@@ -45,7 +45,7 @@ def main() -> int:
     from trl import GRPOConfig, GRPOTrainer
 
     from training.rewards import env_reward, format_reward
-    from training.train_sft import resolve_model
+    from training.train_sft import model_kwargs, resolve_model
 
     seed_everything(cfg["seed"])
     data_dir = Path(cfg["data"]["dir"]) if cfg["data"].get("dir") else DATASETS
@@ -59,7 +59,7 @@ def main() -> int:
     tcfg: Dict[str, Any] = dict(cfg["train"])
     use_cpu = bool(tcfg.pop("use_cpu", False)) or not torch.cuda.is_available()
     bf16 = (not use_cpu) and torch.cuda.is_bf16_supported()
-    model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.bfloat16 if bf16 else torch.float32)
+    model = AutoModelForCausalLM.from_pretrained(model_name, **model_kwargs(cfg["model"], bf16))
     peft_config = None
     if cfg["model"].get("adapter"):
         model = PeftModel.from_pretrained(model, cfg["model"]["adapter"], is_trainable=True)
